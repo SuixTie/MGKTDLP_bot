@@ -1,0 +1,5 @@
+pip install python-telegram-bot  # Или pyTelegramBotAPI для telebot
+pip install requests  # Если используете для HTTP-запросов
+pip install python-dotenv
+pip install bs4
+pip install pywin32
