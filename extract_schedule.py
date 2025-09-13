@@ -1,12 +1,12 @@
 import sys
 import os
-import win32com.client
-import pythoncom
 import re
+from docx import Document
+import docx2txt
 
 def extract_doc_to_txt(doc_path, txt_path):
     """
-    Извлекает текст из Word файла (.doc) и сохраняет в TXT файл,
+    Извлекает текст из Word файла (.doc или .docx) и сохраняет в TXT файл,
     сохраняя отступы и структуру параграфов как в оригинале.
     Удаляет лишние символы перед первым разделителем '│' в строках с колонками.
     """
@@ -17,36 +17,42 @@ def extract_doc_to_txt(doc_path, txt_path):
         if not (doc_path.endswith('.doc') or doc_path.endswith('.docx')):
             raise ValueError("Входной файл должен иметь расширение .doc или .docx")
 
-        # Инициализируем COM для работы с Word
-        pythoncom.CoInitialize()
-        word = win32com.client.Dispatch('Word.Application')
-        word.Visible = False  # Word не отображается
-        doc = word.Documents.Open(os.path.abspath(doc_path))
+        # Инициализируем текст для записи
+        text_lines = []
 
-        # Извлекаем текст из параграфов
-        with open(txt_path, 'w', encoding='utf-8') as txt_file:
-            # Проходим по всем параграфам
-            for para in doc.Paragraphs:
-                text = para.Range.Text.strip()
-                # Проверяем, содержит ли строка разделители '│' (то есть это строка с колонками)
+        if doc_path.endswith('.docx'):
+            # Используем python-docx для .docx
+            doc = Document(doc_path)
+            # Извлекаем текст из параграфов
+            for para in doc.paragraphs:
+                text = para.text.strip()
                 if '│' in text:
-                    # Удаляем любые символы перед первым '│'
                     text = re.sub(r'^[^│]*│', '│', text)
-                txt_file.write(text + '\n')
+                text_lines.append(text)
 
-            # Извлекаем текст из таблиц (если они есть)
-            for table in doc.Tables:
-                for row in table.Rows:
-                    row_text = '\t'.join(cell.Range.Text.strip().replace('\r\x07', '') for cell in row.Cells)
-                    txt_file.write(row_text + '\n')
-                txt_file.write('\n')
+            # Извлекаем текст из таблиц
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = '\t'.join(cell.text.strip() for cell in row.cells)
+                    text_lines.append(row_text)
+                text_lines.append('')
+        else:
+            # Используем docx2txt для .doc
+            text = docx2txt.process(doc_path)
+            # Разделяем на строки и обрабатываем
+            for line in text.splitlines():
+                line = line.strip()
+                if '│' in line:
+                    line = re.sub(r'^[^│]*│', '│', line)
+                text_lines.append(line)
 
-        # Закрываем документ и Word
-        doc.Close()
-        word.Quit()
-        pythoncom.CoUninitialize()
+        # Сохраняем в TXT файл
+        with open(txt_path, 'w', encoding='utf-8') as txt_file:
+            for line in text_lines:
+                if line:  # Пропускаем пустые строки, если не нужны
+                    txt_file.write(line + '\n')
 
-        print(f"Текст успешно извлечен из {doc_path} и сохранен в {txt_path}")
+        print(f"Текст успешно извлечён из {doc_path} и сохранён в {txt_path}")
 
     except Exception as e:
         print(f"Ошибка при обработке {doc_path}: {e}")
@@ -56,13 +62,11 @@ def extract_all_schedules(input_dir="downloaded_schedules", output_dir="extracte
     Извлекает текст из всех файлов расписания за неделю и сохраняет в отдельные TXT файлы.
 
     Args:
-        input_dir (str): Директория с исходными .doc файлами (по умолчанию downloaded_schedules).
+        input_dir (str): Директория с исходными .doc файлами.
         output_dir (str): Директория для сохранения .txt файлов.
     """
-    # Создаём выходную директорию, если её нет
     os.makedirs(output_dir, exist_ok=True)
 
-    # Список файлов расписания
     schedule_files = [
         'rasp_monday.doc',
         'rasp_tuesday.doc',
@@ -81,7 +85,6 @@ def extract_all_schedules(input_dir="downloaded_schedules", output_dir="extracte
 
     for doc_file in schedule_files:
         doc_path = os.path.join(input_dir, doc_file)
-        # Генерируем имя выходного файла, заменяя .doc на .txt
         txt_file = doc_file.replace('.doc', '.txt')
         txt_path = os.path.join(output_dir, txt_file)
 
@@ -99,12 +102,6 @@ def extract_all_schedules(input_dir="downloaded_schedules", output_dir="extracte
     print(f"Обработка завершена: {successful} успешно, {failed} с ошибками")
 
 if __name__ == "__main__":
-    # Директория с .doc файлами (где лежат файлы из первой программы)
-    input_directory = "downloaded_schedules"  # Изменено на папку downloaded_schedules
-    output_directory = "extracted_schedules"  # Папка для .txt файлов
-
-    # Если нужно указать другие директории, раскомментируй и измени:
-    # input_directory = r"C:\Users\YourName\Documents\downloaded_schedules"
-    # output_directory = r"C:\Users\YourName\Documents\extracted_schedules"
-
+    input_directory = "downloaded_schedules"
+    output_directory = "extracted_schedules"
     extract_all_schedules(input_directory, output_directory)
