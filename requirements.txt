@@ -1,5 +1,1 @@
-python-telegram-bot==20.7
-requests==2.32.3
-python-dotenv==1.0.1
-beautifulsoup4==4.12.3
-pywin32==306
+python-telegram-bot==20.7 requests==2.32.3 python-dotenv==1.0.1 beautifulsoup4==4.12.3 python-docx==1.1.2 docx2txt==0.8
