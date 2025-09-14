@@ -40,9 +40,7 @@ def webhook():
         logging.info(f"Webhook POST получен, content_type: {request.content_type}")
         if request.content_type == 'application/json':
             update = request.get_json()
-            logging.info(f"JSON распарсен: {update}")
             bot.process_new_updates([telebot.types.Update.de_json(update)])
-            logging.info("Обновление обработано")
             return jsonify({'status': 'ok'})
         logging.error(f"Неверный content_type: {request.content_type}")
         return 'Bad Request', 400
@@ -97,6 +95,7 @@ def run_scheduled_task():
     success = run_script('get_schedule.py')
     if success:
         logging.info("get_schedule.py завершён успешно, запускаем extract_schedule.py...")
+        run_script('extract_schedule.py')
         run_script('extract_schedule.py')
     else:
         logging.error("get_schedule.py завершился с ошибкой, extract_schedule.py не запускается.")
