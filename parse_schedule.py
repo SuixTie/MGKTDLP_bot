@@ -14,8 +14,6 @@ def retry_api_call(func, *args, retries=3, delay=1, **kwargs):
     """Повторяет вызов Telegram API при сетевых ошибках."""
     for attempt in range(retries):
         try:
-            text = kwargs.get('text', 'N/A')
-            logging.info(f"Отправка сообщения (попытка {attempt+1}): {repr(text)}")
             return func(*args, **kwargs)
         except Exception as e:
             logging.error(f"Ошибка API (попытка {attempt+1}): {e}")
@@ -55,12 +53,11 @@ def parse_schedule(file_path, group_id):
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.read()
-        logging.info(f"Файл {file_path} успешно прочитан:\n{content}")
     except FileNotFoundError:
-        logging.warning(f"Файл {file_path} не найден")
+        logging.error(f"Файл {file_path} не найден")
         return None, None
     except UnicodeDecodeError:
-        logging.warning(f"Ошибка декодирования файла {file_path}")
+        logging.error(f"Ошибка декодирования файла {file_path}")
         return None, None
 
     content = content.rstrip('\n')
@@ -76,31 +73,19 @@ def parse_schedule(file_path, group_id):
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-        logging.info(f"Строка [{i}] в файле {file_path}: '{line}'")
         if not line:
             i += 1
             continue
         if line.startswith('┌') or (line.startswith('│') and line.count('│') >= 3):
-            logging.info(f"  Проверяем как потенциальную строку с группами: '{line}'")
             line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
             cells = [cell.strip() for cell in line.split('│')[1:-1]]
-            logging.info(f"  После split и strip: {cells}")
             is_group_line = cells and all(
-                cell and re.match(r'^[\w-]+$', cell) and (  # Упрощённая проверка: допускаем буквы, цифры, дефис
+                cell and re.match(r'^[\w-]+$', cell) and (
                     re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
                     (re.match(r'^\d+$', cell) and len(cell) >= 3)
                 ) for cell in cells
             )
             if not is_group_line and line.startswith('│'):
-                logging.info(f"  Строка не распознана как группы в файле {file_path}: {cells}")
-                for cell in cells:
-                    if not cell:
-                        logging.warning(f"    Проблема: Пустая ячейка")
-                    elif not re.match(r'^[\w-]+$', cell):
-                        logging.warning(f"    Проблема: Ячейка '{cell}' не соответствует шаблону ^[\\w-]+$")
-                    elif not (re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
-                              (re.match(r'^\d+$', cell) and len(cell) >= 3)):
-                        logging.warning(f"    Проблема: Ячейка '{cell}' не является буквенной или числом >= 3 символов")
                 i += 1
                 continue
             if i >= len(lines):
@@ -108,7 +93,6 @@ def parse_schedule(file_path, group_id):
             group_line = lines[i].strip() if line.startswith('┌') else line
             group_line = group_line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
             groups = [id.strip() for id in group_line.split('│')[1:-1] if id.strip()]
-            logging.info(f"  Группы из строки: {groups}")
             if not groups:
                 i += 1
                 continue
@@ -136,7 +120,7 @@ def parse_schedule(file_path, group_id):
                         save_schedule(groups, block_schedule, schedules)
                     break
                 if line.startswith('│') and line.count('│') >= 3 and all(
-                        cell and re.match(r'^[\w-]+$', cell.strip()) and (  # Упрощённая проверка
+                        cell and re.match(r'^[\w-]+$', cell.strip()) and (
                             re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
                             (re.match(r'^\d+$', cell) and len(cell) >= 3)
                         ) for cell in cells
@@ -176,36 +160,31 @@ def get_schedule_files(folder_path="extracted_schedules"):
     if not os.path.exists(folder_path):
         logging.error(f"Папка {folder_path} не найдена")
         return schedule_files
-    files = os.listdir(folder_path)
-    logging.info(f"Файлы в папке {folder_path}: {files}")
-    for filename in files:
+    for filename in os.listdir(folder_path):
         if filename.endswith('.txt') and filename in days_map:
             file_path = os.path.join(folder_path, filename)
             day_name = days_map[filename]
             schedule_files[day_name] = file_path
-    logging.info(f"Найденные файлы расписания: {schedule_files}")
     return schedule_files
 
 def get_available_groups(folder_path="extracted_schedules"):
     groups = set()
     schedule_files = get_schedule_files(folder_path)
     if not schedule_files:
-        logging.warning(f"Нет файлов расписания в {folder_path}")
+        logging.error(f"Нет файлов расписания в {folder_path}")
         return groups
     for day, file_path in schedule_files.items():
         try:
             with open(file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
             lines = content.rstrip('\n').splitlines()
-            logging.info(f"Содержимое файла {file_path}:\n{content}")
             for i, line in enumerate(lines):
                 line = line.strip()
                 if line.startswith('┌') or (line.startswith('│') and line.count('│') >= 3):
                     line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
                     cells = [cell.strip() for cell in line.split('│')[1:-1]]
-                    logging.info(f"Ячейки в строке {i}: {cells}")
                     is_group_line = cells and all(
-                        cell and re.match(r'^[\w-]+$', cell) and (  # Упрощённая проверка
+                        cell and re.match(r'^[\w-]+$', cell) and (
                             re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
                             (re.match(r'^\d+$', cell) and len(cell) >= 3)
                         ) for cell in cells
@@ -213,10 +192,10 @@ def get_available_groups(folder_path="extracted_schedules"):
                     if is_group_line:
                         groups.update(cell.strip() for cell in cells if cell.strip())
         except FileNotFoundError:
-            logging.warning(f"Файл {file_path} не найден")
+            logging.error(f"Файл {file_path} не найден")
             continue
         except UnicodeDecodeError:
-            logging.warning(f"Ошибка декодирования файла {file_path}")
+            logging.error(f"Ошибка декодирования файла {file_path}")
             continue
     numeric_groups = [g for g in groups if g.isdigit()]
     special_groups = ["8ТО", "9ТО", "10ТО"]
@@ -224,7 +203,6 @@ def get_available_groups(folder_path="extracted_schedules"):
     numeric_groups.sort(key=lambda x: int(x), reverse=True)
     letter_groups.sort()
     sorted_groups = numeric_groups + letter_groups + [g for g in special_groups if g in groups]
-    logging.info(f"Доступные группы: {sorted_groups}")
     return sorted_groups
 
 def get_main_keyboard():
@@ -271,14 +249,14 @@ def register_handlers(bot):
             retry_api_call(
                 bot.send_message,
                 message.chat.id,
-                "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",  # Без Markdown
+                "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
                 parse_mode=None
             )
             return
         retry_api_call(
             bot.send_message,
             message.chat.id,
-            "Привет! 👋 Я помогу тебе узнать расписание звонков и занятий колледжа. Выбери, что тебе нужно:",  # Без Markdown
+            "Привет! 👋 Я помогу тебе узнать расписание звонков и занятий колледжа. Выбери, что тебе нужно:",
             reply_markup=get_main_keyboard(),
             parse_mode=None
         )
@@ -290,14 +268,14 @@ def register_handlers(bot):
             retry_api_call(
                 bot.send_message,
                 message.chat.id,
-                "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",  # Без Markdown
+                "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
                 parse_mode=None
             )
             return
         retry_api_call(
             bot.send_message,
             message.chat.id,
-            "🔄 Выберите новую группу:",  # Без Markdown
+            "🔄 Выберите новую группу:",
             reply_markup=get_groups_keyboard(groups, context="select", page=1),
             parse_mode=None
         )
@@ -334,7 +312,7 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",  # Без Markdown
+                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
                     parse_mode=None
                 )
                 return
@@ -344,7 +322,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text="📚 Сначала выберите группу:",  # Без Markdown
+                    text="📚 Сначала выберите группу:",
                     reply_markup=get_groups_keyboard(groups, context="lessons", page=1),
                     parse_mode=None
                 )
@@ -354,7 +332,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"✅ Группа установлена: {group_id}\nВыберите день недели для просмотра расписания:",  # Без Markdown
+                    text=f"✅ Группа установлена: {group_id}\nВыберите день недели для просмотра расписания:",
                     reply_markup=get_days_keyboard(),
                     parse_mode=None
                 )
@@ -364,7 +342,7 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",  # Без Markdown
+                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
                     parse_mode=None
                 )
                 return
@@ -372,7 +350,7 @@ def register_handlers(bot):
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text="👥 Выберите группу:",  # Без Markdown
+                text="👥 Выберите группу:",
                 reply_markup=get_groups_keyboard(groups, context="select", page=1),
                 parse_mode=None
             )
@@ -382,7 +360,7 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Ошибка в обработке выбора группы.",  # Без Markdown
+                    "❌ Ошибка в обработке выбора группы.",
                     parse_mode=None
                 )
                 return
@@ -394,7 +372,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"✅ Группа установлена: {group_id}\nВыберите день недели для просмотра расписания:",  # Без Markdown
+                    text=f"✅ Группа установлена: {group_id}\nВыберите день недели для просмотра расписания:",
                     reply_markup=get_days_keyboard(),
                     parse_mode=None
                 )
@@ -403,7 +381,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"✅ Группа установлена: {group_id}",  # Без Markdown
+                    text=f"✅ Группа установлена: {group_id}",
                     reply_markup=get_main_keyboard(),
                     parse_mode=None
                 )
@@ -413,7 +391,7 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Ошибка в обработке страниц.",  # Без Markdown
+                    "❌ Ошибка в обработке страниц.",
                     parse_mode=None
                 )
                 return
@@ -424,7 +402,7 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",  # Без Markdown
+                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
                     parse_mode=None
                 )
                 return
@@ -443,7 +421,7 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",  # Без Markdown
+                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
                     parse_mode=None
                 )
                 return
@@ -451,7 +429,7 @@ def register_handlers(bot):
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text="🔄 Выберите новую группу:",  # Без Markdown
+                text="🔄 Выберите новую группу:",
                 reply_markup=get_groups_keyboard(groups, context="select", page=1),
                 parse_mode=None
             )
@@ -460,8 +438,8 @@ def register_handlers(bot):
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text="👋 Выберите опцию:",  # Без Markdown
-                reply_markup=get_main_keyboard(),  # Добавляем клавиатуру
+                text="👋 Выберите опцию:",
+                reply_markup=get_main_keyboard(),
                 parse_mode=None
             )
         else:
@@ -471,7 +449,7 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Сначала выберите группу с помощью /start или /group.",  # Без Markdown
+                    "❌ Сначала выберите группу с помощью /start или /group.",
                     parse_mode=None
                 )
                 return
