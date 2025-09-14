@@ -485,4 +485,3 @@ if __name__ == "__main__":
         print("Доступные группы:", ", ".join(groups))
     else:
         print("Группы не найдены. Проверьте папку 'extracted_schedules'.")
-    bot.polling(none_stop=True)
