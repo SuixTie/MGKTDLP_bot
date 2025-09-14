@@ -37,7 +37,6 @@ logging.info("Обработчики из parse_schedule зарегистрир�
 @flask_app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     try:
-        logging.info(f"Webhook POST получен, content_type: {request.content_type}")
         if request.content_type == 'application/json':
             update = request.get_json()
             bot.process_new_updates([telebot.types.Update.de_json(update)])
