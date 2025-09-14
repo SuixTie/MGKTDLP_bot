@@ -37,15 +37,16 @@ def webhook():
         print(f"Ошибка webhook: {e}")
         return 'Internal Server Error', 500
 
-# Простая главная страница для проверки
+# Простая главная страница для проверки (Render пингует её)
 @flask_app.route('/')
 def index():
-    return 'Telegram Bot is running!'
+    return 'Telegram Bot is running! 🚀'
 
 def run_script(script_name):
     """
     Запускает скрипт с захватом вывода и явной кодировкой UTF-8.
     """
+    print(f"Начинаем запуск {script_name}...")
     if not os.path.exists(script_name):
         print(f"Ошибка: Скрипт {script_name} не найден в текущей директории.")
         return False
@@ -121,14 +122,12 @@ def run_all_scripts_at_startup():
     scripts = ['get_schedule.py', 'extract_schedule.py', 'parse_schedule.py']
     success_count = 0
     for script in scripts:
-        print(f"Запускаем {script} при старте...")
         if run_script(script):
             success_count += 1
         else:
-            print(f"Ошибка: Скрипт {script} завершился с ошибкой, прерываем")
-            return False
+            print(f"Ошибка: Скрипт {script} завершился с ошибкой, продолжаем...")
+            # Не прерываем — продолжаем, чтобы Flask запустился
     print(f"Все скрипты при старте выполнены: {success_count}/3 успешно")
-    return True
 
 def run_schedule_in_background():
     """
@@ -138,6 +137,21 @@ def run_schedule_in_background():
     while running:
         schedule.run_pending()
         time.sleep(60)
+
+def setup_webhook():
+    """
+    Устанавливает webhook в фоне.
+    """
+    render_hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+    if render_hostname:
+        bot.remove_webhook()
+        webhook_url = f"https://{render_hostname}/{BOT_TOKEN}"
+        print(f"Устанавливаем webhook: {webhook_url}")
+        try:
+            bot.set_webhook(url=webhook_url)
+            print(f"Webhook успешно установлен: {webhook_url}")
+        except Exception as e:
+            print(f"Ошибка установки webhook: {e} (продолжаем без webhook)")
 
 def signal_handler(sig, frame):
     """
@@ -152,37 +166,26 @@ def signal_handler(sig, frame):
 
 def main():
     """
-    Основная функция: запускает скрипты при старте, HTTP-сервер с webhook и schedule в фоне.
+    Основная функция: запускает HTTP-сервер сразу, скрипты и schedule в фоне.
     """
     # Регистрируем обработчик сигналов
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Запускаем все скрипты при старте
-    print("Запускаем скрипты при старте программы...")
-    run_all_scripts_at_startup()
+    print("main.py запущен. Начинаем инициализацию...")
 
-    # Логируем переменные для отладки
-    render_hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME')
-    print(f"RENDER_EXTERNAL_HOSTNAME: {render_hostname}")
+    # Запускаем скрипты при старте в фоне (не блокируем Flask)
+    threading.Thread(target=run_all_scripts_at_startup, daemon=True).start()
 
-    # На Render: устанавливаем webhook
-    bot.remove_webhook()
-    webhook_url = f"https://{render_hostname}/{BOT_TOKEN}"
-    print(f"Пытаемся установить webhook: {webhook_url}")
-    try:
-        bot.set_webhook(url=webhook_url)
-        print(f"Webhook успешно установлен: {webhook_url}")
-    except Exception as e:
-        print(f"Ошибка установки webhook: {e}")
-        sys.exit(1)  # Завершаем, так как webhook обязателен для Render
-
-    # Запускаем schedule в отдельном потоке
+    # Запускаем schedule в фоне
     threading.Thread(target=run_schedule_in_background, daemon=True).start()
 
-    # Запускаем Flask для деплоя
-    port = int(os.getenv('PORT', 8443))
-    print(f"Запускаем Flask на порту {port}")
+    # Устанавливаем webhook в фоне
+    threading.Thread(target=setup_webhook, daemon=True).start()
+
+    # Запускаем Flask сразу (открывает порт)
+    port = int(os.getenv('PORT', 10000))  # Render default 10000
+    print(f"Запускаем Flask на порту {port} (для Render)")
     try:
         flask_app.run(host='0.0.0.0', port=port, debug=False)
     except KeyboardInterrupt:
