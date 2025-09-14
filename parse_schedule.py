@@ -14,6 +14,7 @@ def retry_api_call(func, *args, retries=3, delay=1, **kwargs):
     """Повторяет вызов Telegram API при сетевых ошибках."""
     for attempt in range(retries):
         try:
+            logging.info(f"Отправка сообщения: {kwargs.get('text', 'N/A')}")
             return func(*args, **kwargs)
         except Exception as e:
             logging.error(f"Ошибка API (попытка {attempt+1}): {e}")
@@ -80,7 +81,7 @@ def parse_schedule(file_path, group_id):
             cells = [cell.strip() for cell in line.split('│')[1:-1]]
             logging.info(f"  После split и strip: {cells}")
             is_group_line = cells and all(
-                cell and re.match(r'^\\w+$', cell) and (  # Исправлено: ^\\w+$
+                cell and re.match(r'^\\w+$', cell) and (
                     re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
                     (re.match(r'^\d+$', cell) and len(cell) >= 3)
                 ) for cell in cells
@@ -90,7 +91,7 @@ def parse_schedule(file_path, group_id):
                 for cell in cells:
                     if not cell:
                         logging.warning(f"    Проблема: Пустая ячейка")
-                    elif not re.match(r'^\\w+$', cell):  # Исправлено: ^\\w+$
+                    elif not re.match(r'^\\w+$', cell):
                         logging.warning(f"    Проблема: Ячейка '{cell}' не соответствует шаблону ^\\w+$")
                     elif not (re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
                               (re.match(r'^\d+$', cell) and len(cell) >= 3)):
@@ -130,7 +131,7 @@ def parse_schedule(file_path, group_id):
                         save_schedule(groups, block_schedule, schedules)
                     break
                 if line.startswith('│') and line.count('│') >= 3 and all(
-                        cell and re.match(r'^\\w+$', cell.strip()) and (  # Исправлено: ^\\w+$
+                        cell and re.match(r'^\\w+$', cell.strip()) and (
                             re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
                             (re.match(r'^\d+$', cell) and len(cell) >= 3)
                         ) for cell in cells
@@ -192,7 +193,7 @@ def get_available_groups(folder_path="extracted_schedules"):
                     line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
                     cells = [cell.strip() for cell in line.split('│')[1:-1]]
                     is_group_line = cells and all(
-                        cell and re.match(r'^\\w+$', cell) and (  # Исправлено: ^\\w+$
+                        cell and re.match(r'^\\w+$', cell) and (
                             re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
                             (re.match(r'^\d+$', cell) and len(cell) >= 3)
                         ) for cell in cells
@@ -212,6 +213,7 @@ def get_available_groups(folder_path="extracted_schedules"):
     numeric_groups.sort(key=lambda x: int(x), reverse=True)
     letter_groups.sort()
     sorted_groups = numeric_groups + letter_groups + [g for g in special_groups if g in groups]
+    logging.info(f"Доступные группы: {sorted_groups}")
     return sorted_groups
 
 def get_main_keyboard():
@@ -258,16 +260,16 @@ def register_handlers(bot):
             retry_api_call(
                 bot.send_message,
                 message.chat.id,
-                "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
-                parse_mode='Markdown'
+                "❌ Не удалось найти группы\. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'\.",
+                parse_mode='MarkdownV2'
             )
             return
         retry_api_call(
             bot.send_message,
             message.chat.id,
-            "Привет! 👋 \nЯ помогу тебе узнать расписание звонков и занятий колледжа.\nВыбери, что тебе нужно:",
+            "Привет\! 👋 \nЯ помогу тебе узнать расписание звонков и занятий колледжа\.\nВыбери, что тебе нужно\:",
             reply_markup=get_main_keyboard(),
-            parse_mode='Markdown'
+            parse_mode='MarkdownV2'
         )
 
     @bot.message_handler(commands=['group'])
@@ -277,16 +279,16 @@ def register_handlers(bot):
             retry_api_call(
                 bot.send_message,
                 message.chat.id,
-                "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
-                parse_mode='Markdown'
+                "❌ Не удалось найти группы\. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'\.",
+                parse_mode='MarkdownV2'
             )
             return
         retry_api_call(
             bot.send_message,
             message.chat.id,
-            "🔄 Выберите новую группу:",
+            "🔄 Выберите новую группу\:",
             reply_markup=get_groups_keyboard(groups, context="select", page=1),
-            parse_mode='Markdown'
+            parse_mode='MarkdownV2'
         )
 
     @bot.callback_query_handler(func=lambda call: True)
@@ -307,13 +309,15 @@ def register_handlers(bot):
                             "*8 Занятие*: 15:40 – 16:25\n\n" \
                             "*9 Занятие*: 16:35 – 17:20\n\n" \
                             "*10 Занятие*: 17:30 – 18:15"
+            # Экранируем специальные символы для MarkdownV2
+            bells_schedule = bells_schedule.replace('*', '\*').replace('(', '\(').replace(')', '\)').replace('–', '\–')
             retry_api_call(
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 text=bells_schedule,
                 reply_markup=InlineKeyboardMarkup().add(InlineKeyboardButton("🔙 Вернуться назад", callback_data="back_main")),
-                parse_mode='Markdown'
+                parse_mode='MarkdownV2'
             )
         elif call.data == "lessons":
             groups = get_available_groups()
@@ -321,8 +325,8 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
-                    parse_mode='Markdown'
+                    "❌ Не удалось найти группы\. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'\.",
+                    parse_mode='MarkdownV2'
                 )
                 return
             user_id = call.from_user.id
@@ -331,9 +335,9 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text="📚 Сначала выберите группу:",
+                    text="📚 Сначала выберите группу\:",
                     reply_markup=get_groups_keyboard(groups, context="lessons", page=1),
-                    parse_mode='Markdown'
+                    parse_mode='MarkdownV2'
                 )
             else:
                 group_id = user_groups[user_id]
@@ -341,9 +345,9 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"✅ Группа установлена: *{group_id}*\nВыберите день недели для просмотра расписания:",
+                    text=f"✅ Группа установлена: *{group_id}*\nВыберите день недели для просмотра расписания\:",
                     reply_markup=get_days_keyboard(),
-                    parse_mode='Markdown'
+                    parse_mode='MarkdownV2'
                 )
         elif call.data == "select_group":
             groups = get_available_groups()
@@ -351,17 +355,17 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
-                    parse_mode='Markdown'
+                    "❌ Не удалось найти группы\. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'\.",
+                    parse_mode='MarkdownV2'
                 )
                 return
             retry_api_call(
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text="👥 Выберите группу:",
+                text="👥 Выберите группу\:",
                 reply_markup=get_groups_keyboard(groups, context="select", page=1),
-                parse_mode='Markdown'
+                parse_mode='MarkdownV2'
             )
         elif call.data.startswith("group_"):
             parts = call.data.split('_')
@@ -369,8 +373,8 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Ошибка в обработке выбора группы.",
-                    parse_mode='Markdown'
+                    "❌ Ошибка в обработке выбора группы\.",
+                    parse_mode='MarkdownV2'
                 )
                 return
             group_id = parts[1]
@@ -381,9 +385,9 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"✅ Группа установлена: *{group_id}*\nВыберите день недели для просмотра расписания:",
+                    text=f"✅ Группа установлена: *{group_id}*\nВыберите день недели для просмотра расписания\:",
                     reply_markup=get_days_keyboard(),
-                    parse_mode='Markdown'
+                    parse_mode='MarkdownV2'
                 )
             else:
                 retry_api_call(
@@ -392,7 +396,7 @@ def register_handlers(bot):
                     message_id=call.message.message_id,
                     text=f"✅ Группа установлена: *{group_id}*",
                     reply_markup=get_main_keyboard(),
-                    parse_mode='Markdown'
+                    parse_mode='MarkdownV2'
                 )
         elif call.data.startswith("page_"):
             parts = call.data.split('_')
@@ -400,8 +404,8 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Ошибка в обработке страниц.",
-                    parse_mode='Markdown'
+                    "❌ Ошибка в обработке страниц\.",
+                    parse_mode='MarkdownV2'
                 )
                 return
             page = int(parts[1])
@@ -411,18 +415,18 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
-                    parse_mode='Markdown'
+                    "❌ Не удалось найти группы\. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'\.",
+                    parse_mode='MarkdownV2'
                 )
                 return
-            text = "📚 Сначала выберите группу:" if context == "lessons" else "👥 Выберите группу:"
+            text = "📚 Сначала выберите группу\:" if context == "lessons" else "👥 Выберите группу\:"
             retry_api_call(
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 text=text,
                 reply_markup=get_groups_keyboard(groups, context=context, page=page),
-                parse_mode='Markdown'
+                parse_mode='MarkdownV2'
             )
         elif call.data == "change_group":
             groups = get_available_groups()
@@ -430,26 +434,26 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'.",
-                    parse_mode='Markdown'
+                    "❌ Не удалось найти группы\. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'\.",
+                    parse_mode='MarkdownV2'
                 )
                 return
             retry_api_call(
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text="🔄 Выберите новую группу:",
+                text="🔄 Выберите новую группу\:",
                 reply_markup=get_groups_keyboard(groups, context="select", page=1),
-                parse_mode='Markdown'
+                parse_mode='MarkdownV2'
             )
         elif call.data == "back_main":
             retry_api_call(
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text="👋 Выберите опцию:",
+                text="👋 Выберите опцию\:",
                 reply_markup=get_main_keyboard(),
-                parse_mode='Markdown'
+                parse_mode='MarkdownV2'
             )
         else:
             day = call.data
@@ -458,8 +462,8 @@ def register_handlers(bot):
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
-                    "❌ Сначала выберите группу с помощью /start или /group.",
-                    parse_mode='Markdown'
+                    "❌ Сначала выберите группу с помощью /start или /group\.",
+                    parse_mode='MarkdownV2'
                 )
                 return
             group_id = user_groups[user_id]
@@ -472,32 +476,34 @@ def register_handlers(bot):
                     response = f"📚 *Расписание для группы {group_id} на {day} ({date}):*\n\n"
                     for idx, lesson in enumerate(schedule, start=1):
                         if lesson:
-                            response += f"*{idx}.* {lesson}\n"
+                            # Экранируем специальные символы в уроках
+                            lesson = lesson.replace('*', '\*').replace('(', '\(').replace(')', '\)').replace('.', '\.')
+                            response += f"*{idx}\.* {lesson}\n"
                         else:
-                            response += f"*{idx}.* Нет урока\n"
+                            response += f"*{idx}\.* Нет урока\n"
                     retry_api_call(
                         bot.edit_message_text,
                         chat_id=call.message.chat.id,
                         message_id=call.message.message_id,
-                        text=response,
+                        text=response.replace('(', '\(').replace(')', '\)').replace('.', '\.'),
                         reply_markup=get_days_keyboard(),
-                        parse_mode='Markdown'
+                        parse_mode='MarkdownV2'
                     )
                 else:
                     retry_api_call(
                         bot.edit_message_text,
                         chat_id=call.message.chat.id,
                         message_id=call.message.message_id,
-                        text=f"❌ Группа *{group_id}* не найдена в расписании на *{day}*.",
+                        text=f"❌ Группа *{group_id}* не найдена в расписании на *{day}*\.",
                         reply_markup=get_days_keyboard(),
-                        parse_mode='Markdown'
+                        parse_mode='MarkdownV2'
                     )
             else:
                 retry_api_call(
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"❌ Расписание на *{day}* не найдено.",
+                    text=f"❌ Расписание на *{day}* не найдено\.",
                     reply_markup=get_days_keyboard(),
-                    parse_mode='Markdown'
+                    parse_mode='MarkdownV2'
                 )
