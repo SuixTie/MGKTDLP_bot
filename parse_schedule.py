@@ -452,6 +452,7 @@ def register_handlers(bot):
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 text="🔄 Выберите новую группу:",  # Без Markdown
+                reply_markup=get_groups_keyboard(groups, context="select", page=1),
                 parse_mode=None
             )
         elif call.data == "back_main":
@@ -460,6 +461,7 @@ def register_handlers(bot):
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 text="👋 Выберите опцию:",  # Без Markdown
+                reply_markup=get_main_keyboard(),  # Добавляем клавиатуру
                 parse_mode=None
             )
         else:
