@@ -28,19 +28,6 @@ flask_app = Flask(__name__)
 # Инициализация Telegram-бота
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Хендлер для команды /start (перенесён из parse_schedule.py)
-@bot.message_handler(commands=['start'])
-def start(message):
-    try:
-        bot.send_message(
-            message.chat.id,
-            "Привет! Я бот для расписания МГКТДЛП. Введите номер группы или выберите команду.",
-            parse_mode='Markdown'
-        )
-        logging.info(f"Отправлено сообщение /start пользователю {message.chat.id}")
-    except Exception as e:
-        logging.error(f"Ошибка в /start: {e}")
-
 # Webhook-обработчик для Telegram
 @flask_app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
@@ -206,8 +193,7 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Запускаем скрипты при старте в фоне
-    threading.Thread(target=run_all_scripts_at_startup, daemon=True).start()
+    # Запускаем скрипты при старте вრ
 
     # Запускаем schedule в фоне
     threading.Thread(target=run_schedule_in_background, daemon=True).start()
