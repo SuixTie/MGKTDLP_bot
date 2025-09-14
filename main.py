@@ -30,8 +30,10 @@ def webhook():
     try:
         if request.content_type == 'application/json':
             update = request.get_json()
+            print(f"Получено обновление от Telegram: {update}")
             bot.process_new_updates([telebot.types.Update.de_json(update)])
             return jsonify({'status': 'ok'})
+        print(f"Ошибка: Неверный content_type: {request.content_type}")
         return 'Bad Request', 400
     except Exception as e:
         print(f"Ошибка webhook: {e}")
@@ -126,7 +128,6 @@ def run_all_scripts_at_startup():
             success_count += 1
         else:
             print(f"Ошибка: Скрипт {script} завершился с ошибкой, продолжаем...")
-            # Не прерываем — продолжаем, чтобы Flask запустился
     print(f"Все скрипты при старте выполнены: {success_count}/3 успешно")
 
 def run_schedule_in_background():
@@ -168,13 +169,13 @@ def main():
     """
     Основная функция: запускает HTTP-сервер сразу, скрипты и schedule в фоне.
     """
+    print("main.py запущен. Начинаем инициализацию...")
+
     # Регистрируем обработчик сигналов
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    print("main.py запущен. Начинаем инициализацию...")
-
-    # Запускаем скрипты при старте в фоне (не блокируем Flask)
+    # Запускаем скрипты при старте в фоне
     threading.Thread(target=run_all_scripts_at_startup, daemon=True).start()
 
     # Запускаем schedule в фоне
@@ -183,7 +184,7 @@ def main():
     # Устанавливаем webhook в фоне
     threading.Thread(target=setup_webhook, daemon=True).start()
 
-    # Запускаем Flask сразу (открывает порт)
+    # Запускаем Flask сразу
     port = int(os.getenv('PORT', 10000))  # Render default 10000
     print(f"Запускаем Flask на порту {port} (для Render)")
     try:
