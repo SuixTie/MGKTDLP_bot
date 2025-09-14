@@ -193,7 +193,11 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Запускаем скрипты при старте вრ
+    # Запускаем run_scheduled_task при старте
+    run_scheduled_task()
+
+    # Запускаем скрипты при старте в фоне
+    threading.Thread(target=run_all_scripts_at_startup, daemon=True).start()
 
     # Запускаем schedule в фоне
     threading.Thread(target=run_schedule_in_background, daemon=True).start()
