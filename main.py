@@ -3,13 +3,13 @@ import sys
 import os
 import schedule
 import time
-import datetime
 import telebot
 from flask import Flask, request, jsonify
 import threading
 from dotenv import load_dotenv
 import signal
 import logging
+import parse_schedule  # Импортируем parse_schedule как модуль
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -137,7 +137,7 @@ def run_all_scripts_at_startup():
     """
     Запускает все скрипты последовательно при старте программы.
     """
-    scripts = ['get_schedule.py', 'extract_schedule.py', 'parse_schedule.py']
+    scripts = ['get_schedule.py', 'extract_schedule.py']  # Исключаем parse_schedule.py
     success_count = 0
     for script in scripts:
         if run_script(script):
