@@ -16,7 +16,6 @@ if not BOT_TOKEN:
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Остальной код остаётся без изменений
 # Словарь для хранения номеров групп пользователей (user_id: group_id)
 user_groups = {}
 
@@ -90,7 +89,7 @@ def parse_schedule(file_path, group_id):
                     if not cell:
                         print(f"    Проблема: Пустая ячейка")
                     elif not re.match(r'^\w+$', cell):
-                        print(f"    Проблема: Ячейка '{cell}' не соответствует шаблону ^\w+$")
+                        print(f"    Проблема: Ячейка '{cell}' не соответствует шаблону ^\\w+$")
                     elif not (re.match(r'.*[a-zA-ZА-Яа-я].*', cell) or
                               (re.match(r'^\d+$', cell) and len(cell) >= 3)):
                         print(f"    Проблема: Ячейка '{cell}' не является буквенной или числом >= 3 символов")
@@ -476,12 +475,3 @@ def callback_handler(call):
                 reply_markup=get_days_keyboard(),
                 parse_mode='Markdown'
             )
-
-# Запуск бота
-if __name__ == "__main__":
-    print("Бот запущен...")
-    groups = get_available_groups()
-    if groups:
-        print("Доступные группы:", ", ".join(groups))
-    else:
-        print("Группы не найдены. Проверьте папку 'extracted_schedules'.")
