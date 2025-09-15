@@ -87,15 +87,14 @@ def run_script(script_name):
         return False
 
 def run_scheduled_task():
-    """Выполняет get_schedule.py и, если успешно, extract_schedule.py по расписанию."""
+    """Выполняет get_schedule.py и, если успешно, extract_schedule.py."""
     if not running:
         return
-    logging.info(f"Запуск задачи по расписанию...")
+    logging.info("Запуск задачи по расписанию...")
     success = run_script('get_schedule.py')
     if success:
         logging.info("get_schedule.py завершён успешно, запускаем extract_schedule.py...")
-        run_script('extract_schedule.py')
-        run_script('extract_schedule.py')
+        run_script('extract_schedule.py')  # Запускаем один раз
     else:
         logging.error("get_schedule.py завершился с ошибкой, extract_schedule.py не запускается.")
 
@@ -172,6 +171,8 @@ def main():
 
 def run_schedule_in_background():
     """Запускает schedule в фоновом потоке."""
+    # Планируем задачи на 08:00 и 20:00
+    schedule.every().day.at("08:00").do(run_scheduled_task)
     schedule.every().day.at("20:00").do(run_scheduled_task)
     while running:
         schedule.run_pending()
