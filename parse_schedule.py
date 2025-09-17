@@ -46,16 +46,13 @@ def save_schedule(groups, block_schedule, schedules):
                 else:
                     lessons.append('')
             schedules[group] = lessons
-        logging.info(f"Сохранено расписание для групп: {groups}")
     except Exception as e:
         logging.error(f"Ошибка при сохранении расписания: {e}")
 
 def parse_schedule(file_path, group_id):
     try:
-        with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
+        with open(file_path, 'r', encoding='utf-8') as file:
             content = file.read()
-        # Логируем содержимое файла
-        logging.info(f"Содержимое файла {file_path}:\n{content[:500]}")  # Ограничим до 500 символов для читаемости
     except FileNotFoundError:
         logging.error(f"Файл {file_path} не найден")
         return None, None
@@ -79,55 +76,74 @@ def parse_schedule(file_path, group_id):
         if not line:
             i += 1
             continue
-        # Проверяем строки, которые могут содержать группы
-        line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
-        cells = [cell.strip() for cell in re.split(r'\t|│|\s{2,}', line) if cell.strip()]
-        # Более гибкое условие для строк с группами
-        is_group_line = cells and len(cells) >= 1 and all(
-            cell and re.match(r'^[\w\s\-\(\)]+$', cell) for cell in cells
-        )
-        if not is_group_line:
-            i += 1
-            continue
-
-        groups = cells
-        logging.info(f"Найдены группы в строке {line}: {groups}")
-        num_columns = len(groups)
-        block_schedule = [[] for _ in range(num_columns)]
-        i += 1
-
-        # Собираем расписание
-        while i < len(lines):
-            line = lines[i].strip()
-            if not line:
+        if line.startswith('┌') or (line.startswith('│') and line.count('│') >= 3):
+            line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
+            cells = [cell.strip() for cell in line.split('│')[1:-1]]
+            is_group_line = cells and all(
+                cell and (
+                    re.match(r'^\d{3,}$', cell) or  # Только числа длиной 3 и более
+                    re.match(r'^\d+ТО$', cell)      # Специальные группы (8ТО, 9ТО, 10ТО)
+                ) for cell in cells
+            )
+            if not is_group_line and line.startswith('│'):
                 i += 1
                 continue
-            line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
-            cells = [cell.strip() for cell in re.split(r'\t|│|\s{2,}', line) if cell.strip()]
-            if len(cells) >= 1 and all(
-                    cell and re.match(r'^[\w\s\-\(\)]+$', cell) for cell in cells
-            ):
-                if groups and block_schedule:
-                    save_schedule(groups, block_schedule, schedules)
-                i -= 1
+            if i >= len(lines):
                 break
-            if len(cells) != num_columns:
-                cells += [''] * (num_columns - len(cells))
-            for col, cell in enumerate(cells):
-                block_schedule[col].append(cell)
-            i += 1
+            group_line = lines[i].strip() if line.startswith('┌') else line
+            group_line = group_line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
+            groups = [id.strip() for id in group_line.split('│')[1:-1] if id.strip()]
+            if not groups:
+                i += 1
+                continue
 
-        if groups and block_schedule:
-            save_schedule(groups, block_schedule, schedules)
+            num_columns = len(groups)
+            i += 1
+            if i >= len(lines):
+                break
+            connector_line = lines[i].strip()
+            if not connector_line.startswith('├'):
+                i += 1
+                continue
+
+            block_schedule = [[] for _ in range(num_columns)]
+            i += 1
+            while i < len(lines):
+                line = lines[i].strip()
+                if not line:
+                    i += 1
+                    continue
+                line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
+                cells = [cell.strip() for cell in line.split('│')[1:-1]]
+                if line.startswith('┌') or line.startswith('└'):
+                    if groups and block_schedule:
+                        save_schedule(groups, block_schedule, schedules)
+                    break
+                if line.startswith('│') and line.count('│') >= 3 and all(
+                        cell and (
+                            re.match(r'^\d{3,}$', cell) or
+                            re.match(r'^\d+ТО$', cell)
+                        ) for cell in cells
+                ):
+                    if groups and block_schedule:
+                        save_schedule(groups, block_schedule, schedules)
+                    i -= 1
+                    break
+                if len(cells) != num_columns:
+                    cells += [''] * (num_columns - len(cells))
+                for col, cell in enumerate(cells):
+                    block_schedule[col].append(cell)
+                i += 1
+
+            if groups and block_schedule and i >= len(lines):
+                save_schedule(groups, block_schedule, schedules)
 
         i += 1
 
     group_id = group_id.strip()
     if group_id in schedules and any(schedules[group_id]):
-        logging.info(f"Расписание для группы {group_id}: {schedules[group_id]}")
         return schedules[group_id], date
     else:
-        logging.warning(f"Группа {group_id} не найдена в расписании {file_path}")
         return None, date
 
 def get_schedule_files(folder_path="extracted_schedules"):
@@ -149,7 +165,6 @@ def get_schedule_files(folder_path="extracted_schedules"):
             file_path = os.path.join(folder_path, filename)
             day_name = days_map[filename]
             schedule_files[day_name] = file_path
-    logging.info(f"Найдены файлы расписания: {schedule_files}")
     return schedule_files
 
 def get_available_groups(folder_path="extracted_schedules"):
@@ -160,25 +175,22 @@ def get_available_groups(folder_path="extracted_schedules"):
         return groups
     for day, file_path in schedule_files.items():
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
+            with open(file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
-            # Логируем содержимое файла
-            logging.info(f"Содержимое файла {file_path}:\n{content[:500]}")  # Ограничим до 500 символов
             lines = content.rstrip('\n').splitlines()
             for i, line in enumerate(lines):
                 line = line.strip()
-                if not line:
-                    continue
-                line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
-                # Разделяем по табуляции, │ или множественным пробелам
-                cells = [cell.strip() for cell in re.split(r'\t|│|\s{2,}', line) if cell.strip()]
-                # Более гибкое условие для групп
-                is_group_line = cells and len(cells) >= 1 and all(
-                    cell and re.match(r'^[\w\s\-\(\)]+$', cell) for cell in cells
-                )
-                if is_group_line:
-                    groups.update(cell.strip() for cell in cells if cell.strip())
-                    logging.info(f"Найдены группы в {file_path}: {cells}")
+                if line.startswith('┌') or (line.startswith('│') and line.count('│') >= 3):
+                    line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
+                    cells = [cell.strip() for cell in line.split('│')[1:-1]]
+                    is_group_line = cells and all(
+                        cell and (
+                            re.match(r'^\d{3,}$', cell) or  # Только числа длиной 3 и более
+                            re.match(r'^\d+ТО$', cell)      # Специальные группы (8ТО, 9ТО, 10ТО)
+                        ) for cell in cells
+                    )
+                    if is_group_line:
+                        groups.update(cell.strip() for cell in cells if cell.strip())
         except FileNotFoundError:
             logging.error(f"Файл {file_path} не найден")
             continue
@@ -187,11 +199,8 @@ def get_available_groups(folder_path="extracted_schedules"):
             continue
     numeric_groups = [g for g in groups if g.isdigit()]
     special_groups = ["8ТО", "9ТО", "10ТО"]
-    letter_groups = [g for g in groups if not g.isdigit() and g not in special_groups]
     numeric_groups.sort(key=lambda x: int(x), reverse=True)
-    letter_groups.sort()
-    sorted_groups = numeric_groups + letter_groups + [g for g in special_groups if g in groups]
-    logging.info(f"Всего найдено групп: {sorted_groups}")
+    sorted_groups = numeric_groups + [g for g in special_groups if g in groups]
     return sorted_groups
 
 def get_main_keyboard():
