@@ -7,7 +7,8 @@ import docx2txt
 import logging
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def extract_doc_to_txt(doc_path, txt_path):
     """
@@ -27,55 +28,77 @@ def extract_doc_to_txt(doc_path, txt_path):
             try:
                 doc = Document(doc_path)
                 logging.info(f"Открыт .docx файл: {doc_path}")
-                # Извлекаем текст из параграфов
+                # Извлекаем текст из параграфов (заголовки, например, "СКОРРЕКТИРОВАННОЕ РАСПИСАНИЕ")
                 for para in doc.paragraphs:
                     text = para.text.strip()
-                    if '│' in text:
-                        text = re.sub(r'^[^│]*│', '│', text)
-                    text_lines.append(text)
+                    if text:
+                        text_lines.append(text)
+                        logging.debug(f"Извлечен параграф: {text}")
 
                 # Извлекаем текст из таблиц
                 for table in doc.tables:
+                    # Определяем максимальное количество столбцов
+                    max_columns = max(len(row.cells) for row in table.rows)
+                    logging.debug(f"Обработка таблицы с {max_columns} столбцами")
+
+                    # Обрабатываем каждую строку таблицы
                     for row in table.rows:
-                        # Сохраняем каждую ячейку отдельно, учитывая возможные объединения
-                        cells = [cell.text.strip() for cell in row.cells]
+                        cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
+                        # Заполняем пустые ячейки, если их меньше, чем max_columns
+                        while len(cells) < max_columns:
+                            cells.append('')
                         # Формируем строку с разделителями │
                         row_text = '│' + '│'.join(cells) + '│'
                         text_lines.append(row_text)
-                    text_lines.append('')  # Пустая строка между таблицами
+                        logging.debug(f"Извлечена строка таблицы: {row_text}")
+                    # Добавляем пустую строку между таблицами
+                    text_lines.append('')
             except Exception as e:
                 raise ValueError(f"Ошибка при обработке .docx файла {doc_path}: {e}")
         else:
-            # Обработка .doc файлов
+            # Обработка .doc файлов через docx2txt (antiword менее надежен)
             try:
-                result = subprocess.run(
-                    ['antiword', doc_path],
-                    capture_output=True,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace'
-                )
-                logging.info(f"Открыт .doc файл через antiword: {doc_path}")
-                text = result.stdout
-                if result.stderr:
-                    logging.warning(f"STDERR antiword: {result.stderr}")
-                for line in text.splitlines():
+                text = docx2txt.process(doc_path)
+                logging.info(f"Открыт .doc файл через docx2txt: {doc_path}")
+                lines = text.splitlines()
+                current_table = []
+                max_columns = 0
+
+                for line in lines:
                     line = line.strip()
+                    if not line:
+                        if current_table:
+                            # Завершаем таблицу
+                            for row in current_table:
+                                cells = row.split('│')[1:-1] if '│' in row else row.split()
+                                while len(cells) < max_columns:
+                                    cells.append('')
+                                row_text = '│' + '│'.join(cells) + '│'
+                                text_lines.append(row_text)
+                                logging.debug(f"Извлечена строка таблицы (.doc): {row_text}")
+                            text_lines.append('')
+                            current_table = []
+                            max_columns = 0
+                        continue
                     if '│' in line:
                         line = re.sub(r'^[^│]*│', '│', line)
-                    text_lines.append(line)
-            except FileNotFoundError:
-                logging.error("antiword не установлен. Пробуем docx2txt для .doc")
-                try:
-                    text = docx2txt.process(doc_path)
-                    logging.info(f"Открыт .doc файл через docx2txt: {doc_path}")
-                    for line in text.splitlines():
-                        line = line.strip()
-                        if '│' in line:
-                            line = re.sub(r'^[^│]*│', '│', line)
+                        cells = line.split('│')[1:-1]
+                        max_columns = max(max_columns, len(cells))
+                        current_table.append(line)
+                    else:
                         text_lines.append(line)
-                except Exception as e:
-                    raise ValueError(f"Ошибка при обработке .doc файла {doc_path}: {e}")
+                        logging.debug(f"Извлечен текст (.doc): {line}")
+                # Сохраняем последнюю таблицу, если она есть
+                if current_table:
+                    for row in current_table:
+                        cells = row.split('│')[1:-1]
+                        while len(cells) < max_columns:
+                            cells.append('')
+                        row_text = '│' + '│'.join(cells) + '│'
+                        text_lines.append(row_text)
+                        logging.debug(f"Извлечена строка таблицы (.doc): {row_text}")
+            except Exception as e:
+                raise ValueError(f"Ошибка при обработке .doc файла {doc_path}: {e}")
 
         if not text_lines or all(not line.strip() for line in text_lines):
             raise ValueError(f"Файл {doc_path} пуст или не содержит полезного текста")
@@ -86,56 +109,16 @@ def extract_doc_to_txt(doc_path, txt_path):
             for line in text_lines:
                 txt_file.write(line + '\n')
         logging.info(f"Текст успешно извлечён из {doc_path} и сохранён в {txt_path}")
+
+        # Отладочный вывод содержимого файла
+        with open(txt_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            logging.info(f"Содержимое файла {txt_path}:")
+            for i, line in enumerate(lines, 1):
+                logging.debug(f"Строка {i}: {line.strip()}")
+
         return True
 
     except Exception as e:
         logging.error(f"Ошибка при обработке {doc_path}: {e}")
         return False
-
-def extract_all_schedules(input_dir="downloaded_schedules", output_dir="extracted_schedules"):
-    """
-    Извлекает текст из всех файлов расписания за неделю и сохраняет в отдельные TXT файлы.
-
-    Args:
-        input_dir (str): Директория с исходными .doc файлами.
-        output_dir (str): Директория для сохранения .txt файлов.
-    """
-    os.makedirs(output_dir, exist_ok=True)
-
-    schedule_files = [
-        'rasp_monday.doc',
-        'rasp_tuesday.doc',
-        'rasp_wednesday.doc',
-        'rasp_thursday.doc',
-        'rasp_friday.doc',
-        'rasp_saturday.doc'
-    ]
-
-    successful = 0
-    failed = 0
-
-    logging.info(f"Начинаем обработку расписаний из директории: {input_dir}")
-    logging.info(f"Выходные файлы будут сохранены в: {output_dir}")
-    logging.info(f"Файлы в {input_dir}: {os.listdir(input_dir) if os.path.exists(input_dir) else 'Папка не найдена'}")
-
-    for doc_file in schedule_files:
-        doc_path = os.path.join(input_dir, doc_file)
-        txt_file = doc_file.replace('.doc', '.txt')
-        txt_path = os.path.join(output_dir, txt_file)
-
-        logging.info(f"Обрабатываем: {doc_file} -> {txt_file}")
-        if extract_doc_to_txt(doc_path, txt_path):
-            successful += 1
-            logging.info(f"✓ Успешно обработан: {doc_file}")
-        else:
-            failed += 1
-            logging.error(f"✗ Ошибка при обработке {doc_file}")
-        logging.info("")
-
-    logging.info(f"Обработка завершена: {successful} успешно, {failed} с ошибками")
-    return successful, failed
-
-if __name__ == "__main__":
-    input_directory = "downloaded_schedules"
-    output_directory = "extracted_schedules"
-    extract_all_schedules(input_directory, output_directory)
