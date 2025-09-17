@@ -1,13 +1,12 @@
 FROM python:3.9-slim
 
-# Установка antiword и libreoffice
+# Установка libreoffice для конверсии .doc в .docx
 RUN apt-get update && \
-    apt-get install -y antiword libreoffice && \
+    apt-get install -y libreoffice-headless && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Проверка установки antiword и libreoffice
-RUN which antiword || { echo "antiword installation failed"; exit 1; }
+# Проверка установки libreoffice
 RUN libreoffice --version || { echo "libreoffice installation failed"; exit 1; }
 
 # Установка зависимостей Python
