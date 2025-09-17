@@ -50,7 +50,7 @@ def save_schedule(groups, block_schedule, schedules):
                         subject = subject_match.group(0).rstrip('/').strip()
                         rooms = cleaned[subject_match.end():].strip()
                         rooms = re.sub(r'\bпр', '', rooms)
-                        cleaned = f"{subject} \\({rooms}\\)" if rooms else subject  # Экранируем скобки
+                        cleaned = f"{subject} ({rooms})" if rooms else subject  # Без экранирования
                     else:
                         subject = cleaned
                         cleaned = subject
@@ -505,20 +505,21 @@ def register_handlers(bot):
                 logging.debug(f"Выбран файл для дня {day}: {selected_file}")
                 schedule, date = parse_schedule(selected_file, group_id)
                 if schedule:
-                    # Исправленный response с экранированием lesson
-                    response = f"📚 Расписание для группы {escape_markdown_v2(group_id)} на {escape_markdown_v2(day)} \\({escape_markdown_v2(date)}\\):\\n\\n"
+                    # Формируем response без предварительного экранирования
+                    response = f"📚 Расписание для группы {group_id} на {day} ({date}):\\n\\n"
                     for idx, lesson in enumerate(schedule, start=1):
                         if lesson:
-                            lesson_escaped = escape_markdown_v2(lesson)
-                            response += f"{idx}\\. {lesson_escaped}\\n"
+                            response += f"{idx}\\. {lesson}\\n"
                         else:
                             response += f"{idx}\\. Нет урока\\n"
-                    logging.debug(f"Сформированный response: {response}")
+                    # Экранируем весь response целиком
+                    escaped_response = escape_markdown_v2(response)
+                    logging.debug(f"Сформированный response: {escaped_response}")
                     retry_api_call(
                         bot.edit_message_text,
                         chat_id=call.message.chat.id,
                         message_id=call.message.message_id,
-                        text=response,
+                        text=escaped_response,
                         reply_markup=get_days_keyboard(),
                         parse_mode='MarkdownV2'
                     )
