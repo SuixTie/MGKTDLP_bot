@@ -2,11 +2,46 @@ import sys
 import os
 import re
 import subprocess
+import tempfile
 from docx import Document
 import logging
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+def convert_doc_to_docx(doc_path, temp_dir):
+    """
+    Конвертирует .doc файл в .docx с помощью libreoffice.
+    Возвращает путь к .docx файлу или None в случае ошибки.
+    """
+    try:
+        # Создаём временный файл для .docx
+        temp_docx_path = os.path.join(temp_dir, os.path.basename(doc_path).replace('.doc', '.docx'))
+        logging.info(f"Конвертируем {doc_path} в {temp_docx_path} с помощью libreoffice")
+
+        # Запускаем libreoffice для конверсии
+        result = subprocess.run(
+            ['libreoffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', temp_dir],
+            capture_output=True, text=True, timeout=60  # Таймаут для избежания зависания
+        )
+        if result.returncode != 0:
+            logging.error(f"Ошибка конверсии {doc_path} в .docx: {result.stderr}")
+            return None
+
+        if not os.path.exists(temp_docx_path):
+            logging.error(f"Файл {temp_docx_path} не был создан")
+            return None
+
+        logging.info(f"Успешно сконвертирован {doc_path} в {temp_docx_path}")
+        return temp_docx_path
+    except subprocess.TimeoutExpired:
+        logging.error(f"Таймаут при конверсии {doc_path}")
+        return None
+    except Exception as e:
+        logging.error(f"Ошибка при конверсии {doc_path} в .docx: {e}")
+        return None
+
 
 def extract_doc_to_txt(doc_path, txt_path):
     """
@@ -22,82 +57,47 @@ def extract_doc_to_txt(doc_path, txt_path):
         logging.info(f"Обработка файла: {doc_path}")
         text_lines = []
 
-        if doc_path.endswith('.docx'):
-            try:
-                doc = Document(doc_path)
-                logging.info(f"Открыт .docx файл: {doc_path}")
-                # Извлекаем текст из параграфов
-                for para in doc.paragraphs:
-                    text = para.text.strip()
-                    if text:
-                        text_lines.append(text)
-                        logging.debug(f"Извлечен параграф: {text}")
+        # Если файл .doc, конвертируем в .docx
+        temp_docx_path = doc_path
+        temp_dir = None
+        if doc_path.endswith('.doc'):
+            temp_dir = tempfile.mkdtemp()
+            temp_docx_path = convert_doc_to_docx(doc_path, temp_dir)
+            if not temp_docx_path:
+                raise RuntimeError(f"Не удалось конвертировать {doc_path} в .docx")
 
-                # Извлекаем текст из таблиц
-                for table in doc.tables:
-                    max_columns = max(len(row.cells) for row in table.rows)
-                    logging.debug(f"Обработка таблицы с {max_columns} столбцами")
-                    for row in table.rows:
-                        cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
-                        while len(cells) < max_columns:
-                            cells.append('')
-                        row_text = '│' + '│'.join(cells) + '│'
-                        text_lines.append(row_text)
-                        logging.debug(f"Извлечена строка таблицы: {row_text}")
-                    text_lines.append('')
-            except Exception as e:
-                logging.error(f"Ошибка при обработке .docx файла {doc_path}: {e}")
-                raise
-        else:
-            # Обработка .doc файлов через antiword
-            try:
-                # Проверяем наличие antiword
-                result = subprocess.run(['which', 'antiword'], capture_output=True, text=True)
-                if result.returncode != 0:
-                    raise RuntimeError("antiword не установлен или не доступен")
+        # Извлечение текста из .docx
+        try:
+            doc = Document(temp_docx_path)
+            logging.info(f"Открыт файл: {temp_docx_path}")
+            # Извлекаем текст из параграфов
+            for para in doc.paragraphs:
+                text = para.text.strip()
+                if text:
+                    text_lines.append(text)
+                    logging.debug(f"Извлечен параграф: {text}")
 
-                # Извлекаем текст с помощью antiword
-                result = subprocess.run(['antiword', doc_path], capture_output=True, text=True)
-                if result.returncode != 0:
-                    raise RuntimeError(f"Ошибка antiword: {result.stderr}")
-
-                logging.info(f"Открыт .doc файл через antiword: {doc_path}")
-                lines = result.stdout.splitlines()
-                current_table = []
-                max_columns = 0
-
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        if current_table:
-                            for row in current_table:
-                                cells = row.split()
-                                while len(cells) < max_columns:
-                                    cells.append('')
-                                row_text = '│' + '│'.join(cells) + '│'
-                                text_lines.append(row_text)
-                                logging.debug(f"Извлечена строка таблицы (.doc): {row_text}")
-                            text_lines.append('')
-                            current_table = []
-                            max_columns = 0
-                        continue
-                    cells = line.split()
-                    max_columns = max(max_columns, len(cells))
-                    current_table.append(line)
-                    logging.debug(f"Извлечен текст (.doc): {line}")
-
-                if current_table:
-                    for row in current_table:
-                        cells = row.split()
-                        while len(cells) < max_columns:
-                            cells.append('')
-                        row_text = '│' + '│'.join(cells) + '│'
-                        text_lines.append(row_text)
-                        logging.debug(f"Извлечена строка таблицы (.doc): {row_text}")
-
-            except Exception as e:
-                logging.error(f"Ошибка при обработке .doc файла {doc_path} через antiword: {e}")
-                raise
+            # Извлекаем текст из таблиц
+            for table in doc.tables:
+                max_columns = max(len(row.cells) for row in table.rows)
+                logging.debug(f"Обработка таблицы с {max_columns} столбцами")
+                for row in table.rows:
+                    cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
+                    while len(cells) < max_columns:
+                        cells.append('')
+                    row_text = '│' + '│'.join(cells) + '│'
+                    text_lines.append(row_text)
+                    logging.debug(f"Извлечена строка таблицы: {row_text}")
+                text_lines.append('')
+        except Exception as e:
+            logging.error(f"Ошибка при обработке файла {temp_docx_path}: {e}")
+            raise
+        finally:
+            # Удаляем временные файлы
+            if temp_dir:
+                if os.path.exists(temp_docx_path):
+                    os.remove(temp_docx_path)
+                os.rmdir(temp_dir)
 
         if not text_lines or all(not line.strip() for line in text_lines):
             logging.warning(f"Файл {doc_path} пуст или не содержит полезного текста")
@@ -125,6 +125,7 @@ def extract_doc_to_txt(doc_path, txt_path):
     except Exception as e:
         logging.error(f"Ошибка при обработке {doc_path}: {e}")
         return False
+
 
 def main():
     """Основная функция для обработки всех .doc файлов в downloaded_schedules."""
@@ -162,6 +163,7 @@ def main():
     logging.info(f"Обработка завершена: {success_count} успешно, {error_count} ошибок")
     if error_count > 0:
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
