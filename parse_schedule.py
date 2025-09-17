@@ -509,9 +509,9 @@ def register_handlers(bot):
                     response = f"📚 Расписание для группы {group_id} на {day} ({date}):\\n\\n"
                     for idx, lesson in enumerate(schedule, start=1):
                         if lesson:
-                            response += f"{idx}\\. {lesson}\\n"
+                            response += f"{idx}. {lesson}\\n"
                         else:
-                            response += f"{idx}\\. Нет урока\\n"
+                            response += f"{idx}. Нет урока\\n"
                     # Экранируем весь response целиком
                     escaped_response = escape_markdown_v2(response)
                     logging.debug(f"Сформированный response: {escaped_response}")
