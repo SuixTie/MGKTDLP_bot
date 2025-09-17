@@ -25,7 +25,7 @@ def convert_doc_to_docx(doc_path, temp_dir):
             ['libreoffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', temp_dir],
             capture_output=True, text=True, timeout=60  # Таймаут для избежания зависания
         )
-        if result.returncode != 0:
+        if result.return_code != 0:
             logging.error(f"Ошибка конверсии {doc_path} в .docx: {result.stderr}")
             return None
 
@@ -83,9 +83,23 @@ def extract_doc_to_txt(doc_path, txt_path):
                 logging.debug(f"Обработка таблицы с {max_columns} столбцами")
                 for row in table.rows:
                     cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
-                    while len(cells) < max_columns:
-                        cells.append('')
-                    row_text = '│' + '│'.join(cells) + '│'
+                    # Обработка объединённых ячеек (merged cells)
+                    merged_cells = []
+                    col_idx = 0
+                    for cell in row.cells:
+                        if cell._tc.grid_span > 1 or cell._tc.vMerge:
+                            # Для объединённых ячеек дублируем текст или добавляем пустые
+                            merged_cells.append(cell.text.strip().replace('\n', ' '))
+                            for _ in range(cell._tc.grid_span - 1):
+                                merged_cells.append('')
+                                col_idx += 1
+                        else:
+                            merged_cells.append(cell.text.strip().replace('\n', ' '))
+                        col_idx += 1
+                    # Заполняем до max_columns
+                    while len(merged_cells) < max_columns:
+                        merged_cells.append('')
+                    row_text = '│' + '│'.join(merged_cells) + '│'
                     text_lines.append(row_text)
                     logging.debug(f"Извлечена строка таблицы: {row_text}")
                 text_lines.append('')
