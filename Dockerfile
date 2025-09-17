@@ -1,8 +1,8 @@
 FROM python:3.9-slim
 
-# Установка libreoffice и default-jre для конверсии .doc в .docx
+# Установка libreoffice, default-jre и дополнительных зависимостей
 RUN apt-get update && \
-    apt-get install -y libreoffice default-jre && \
+    apt-get install -y libreoffice default-jre fontconfig libx11-6 libxrender1 libfontconfig1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
