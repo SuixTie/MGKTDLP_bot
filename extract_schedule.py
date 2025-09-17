@@ -50,11 +50,20 @@ def extract_doc_to_txt(doc_path, txt_path):
                 logging.error(f"Ошибка при обработке .docx файла {doc_path}: {e}")
                 raise
         else:
-            # Обработка .doc файлов через docx2txt
+            # Обработка .doc файлов через antiword
             try:
-                text = docx2txt.process(doc_path)
-                logging.info(f"Открыт .doc файл через docx2txt: {doc_path}")
-                lines = text.splitlines()
+                # Проверяем наличие antiword
+                result = subprocess.run(['antiword', '-v'], capture_output=True, text=True)
+                if 'antiword' not in result.stdout.lower():
+                    raise RuntimeError("antiword не установлен или не доступен")
+
+                # Извлекаем текст с помощью antiword
+                result = subprocess.run(['antiword', doc_path], capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise RuntimeError(f"Ошибка antiword: {result.stderr}")
+
+                logging.info(f"Открыт .doc файл через antiword: {doc_path}")
+                lines = result.stdout.splitlines()
                 current_table = []
                 max_columns = 0
 
@@ -63,7 +72,7 @@ def extract_doc_to_txt(doc_path, txt_path):
                     if not line:
                         if current_table:
                             for row in current_table:
-                                cells = row.split('│')[1:-1] if '│' in row else row.split()
+                                cells = row.split()  # Разделяем по пробелам, так как antiword не использует '│'
                                 while len(cells) < max_columns:
                                     cells.append('')
                                 row_text = '│' + '│'.join(cells) + '│'
@@ -73,25 +82,36 @@ def extract_doc_to_txt(doc_path, txt_path):
                             current_table = []
                             max_columns = 0
                         continue
-                    if '│' in line:
-                        line = re.sub(r'^[^│]*│', '│', line)
-                        cells = line.split('│')[1:-1]
-                        max_columns = max(max_columns, len(cells))
-                        current_table.append(line)
-                    else:
-                        text_lines.append(line)
-                        logging.debug(f"Извлечен текст (.doc): {line}")
+                    # Предполагаем, что строки с пробелами между словами могут быть частью таблицы
+                    cells = line.split()
+                    max_columns = max(max_columns, len(cells))
+                    current_table.append(line)
+                    logging.debug(f"Извлечен текст (.doc): {line}")
+
                 if current_table:
                     for row in current_table:
-                        cells = row.split('│')[1:-1]
+                        cells = row.split()
                         while len(cells) < max_columns:
                             cells.append('')
                         row_text = '│' + '│'.join(cells) + '│'
                         text_lines.append(row_text)
                         logging.debug(f"Извлечена строка таблицы (.doc): {row_text}")
+
             except Exception as e:
                 logging.error(f"Ошибка при обработке .doc файла {doc_path}: {e}")
-                raise
+                # Fallback на docx2txt, если antiword не сработал
+                try:
+                    text = docx2txt.process(doc_path)
+                    logging.info(f"Fallback: Открыт .doc файл через docx2txt: {doc_path}")
+                    lines = text.splitlines()
+                    for line in lines:
+                        line = line.strip()
+                        if line:
+                            text_lines.append(line)
+                            logging.debug(f"Извлечен текст (.doc, docx2txt): {line}")
+                except Exception as e2:
+                    logging.error(f"Fallback на docx2txt также не удался для {doc_path}: {e2}")
+                    raise e
 
         if not text_lines or all(not line.strip() for line in text_lines):
             logging.warning(f"Файл {doc_path} пуст или не содержит полезного текста")
@@ -130,12 +150,22 @@ def main():
     doc_files = [f for f in os.listdir(downloaded_dir) if f.endswith(('.doc', '.docx'))]
     logging.info(f"Найдено {len(doc_files)} файлов: {doc_files}")
 
+    # Соответствие файлов дням недели
+    day_mapping = {
+        "rasp_monday.doc": "rasp_monday.txt",
+        "rasp_tuesday.doc": "rasp_tuesday.txt",
+        "rasp_wednesday.doc": "rasp_wednesday.txt",
+        "rasp_thursday.doc": "rasp_thursday.txt",
+        "rasp_friday.doc": "rasp_friday.txt",
+        "rasp_saturday.doc": "rasp_saturday.txt",
+    }
+
     success_count = 0
     error_count = 0
 
     for doc_file in doc_files:
         doc_path = os.path.join(downloaded_dir, doc_file)
-        txt_file = doc_file.replace('.docx', '.txt').replace('.doc', '.txt')
+        txt_file = day_mapping.get(doc_file, doc_file.replace('.docx', '.txt').replace('.doc', '.txt'))
         txt_path = os.path.join(extracted_dir, txt_file)
         logging.info(f"Обрабатываем {doc_path} -> {txt_path}")
         if extract_doc_to_txt(doc_path, txt_path):
