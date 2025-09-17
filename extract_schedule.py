@@ -9,7 +9,6 @@ import logging
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 def convert_doc_to_docx(doc_path, temp_dir):
     """
     Конвертирует .doc файл в .docx с помощью libreoffice.
@@ -20,11 +19,20 @@ def convert_doc_to_docx(doc_path, temp_dir):
         temp_docx_path = os.path.join(temp_dir, os.path.basename(doc_path).replace('.doc', '.docx'))
         logging.info(f"Конвертируем {doc_path} в {temp_docx_path} с помощью libreoffice")
 
+        # Проверяем, существует ли команда libreoffice
+        if subprocess.run(['which', 'libreoffice'], capture_output=True, text=True).return_code != 0:
+            logging.error("libreoffice не найден в системе")
+            return None
+
         # Запускаем libreoffice для конверсии
         result = subprocess.run(
             ['libreoffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', temp_dir],
-            capture_output=True, text=True, timeout=60  # Таймаут для избежания зависания
+            capture_output=True, text=True, timeout=60
         )
+        logging.debug(f"Команда libreoffice: {result.args}")
+        logging.debug(f"Вывод libreoffice (stdout): {result.stdout}")
+        logging.debug(f"Ошибки libreoffice (stderr): {result.stderr}")
+
         if result.return_code != 0:
             logging.error(f"Ошибка конверсии {doc_path} в .docx: {result.stderr}")
             return None
@@ -41,7 +49,6 @@ def convert_doc_to_docx(doc_path, temp_dir):
     except Exception as e:
         logging.error(f"Ошибка при конверсии {doc_path} в .docx: {e}")
         return None
-
 
 def extract_doc_to_txt(doc_path, txt_path):
     """
@@ -88,7 +95,6 @@ def extract_doc_to_txt(doc_path, txt_path):
                     col_idx = 0
                     for cell in row.cells:
                         if cell._tc.grid_span > 1 or cell._tc.vMerge:
-                            # Для объединённых ячеек дублируем текст или добавляем пустые
                             merged_cells.append(cell.text.strip().replace('\n', ' '))
                             for _ in range(cell._tc.grid_span - 1):
                                 merged_cells.append('')
@@ -140,7 +146,6 @@ def extract_doc_to_txt(doc_path, txt_path):
         logging.error(f"Ошибка при обработке {doc_path}: {e}")
         return False
 
-
 def main():
     """Основная функция для обработки всех .doc файлов в downloaded_schedules."""
     downloaded_dir = "downloaded_schedules"
@@ -177,7 +182,6 @@ def main():
     logging.info(f"Обработка завершена: {success_count} успешно, {error_count} ошибок")
     if error_count > 0:
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
