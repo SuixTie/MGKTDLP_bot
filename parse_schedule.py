@@ -272,15 +272,22 @@ def get_days_keyboard():
     return keyboard
 
 def register_handlers(bot):
+    def escape_markdown_v2(text):
+        """Экранирует специальные символы для MarkdownV2."""
+        special_chars = r'([._*~`\[()\]#+-=|{}.!])'
+        return re.sub(special_chars, r'\\\1', str(text))
+
     @bot.message_handler(commands=['start'])
     def start(message):
         groups = get_available_groups()
         logging.debug(f"Команда /start, доступные группы: {groups}")
         if not groups:
+            error_text = "❌ Не удалось найти группы. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'."
+            escaped_text = escape_markdown_v2(error_text)
             retry_api_call(
                 bot.send_message,
                 message.chat.id,
-                "❌ Не удалось найти группы\\. Убедитесь, что файлы расписания находятся в папке 'extracted_schedules'\\.",
+                escaped_text,
                 parse_mode='MarkdownV2'
             )
             return
