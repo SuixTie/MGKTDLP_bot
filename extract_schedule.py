@@ -3,7 +3,6 @@ import os
 import re
 import subprocess
 from docx import Document
-import docx2txt
 import logging
 
 # Настройка логирования
@@ -53,8 +52,8 @@ def extract_doc_to_txt(doc_path, txt_path):
             # Обработка .doc файлов через antiword
             try:
                 # Проверяем наличие antiword
-                result = subprocess.run(['antiword', '-v'], capture_output=True, text=True)
-                if 'antiword' not in result.stdout.lower():
+                result = subprocess.run(['which', 'antiword'], capture_output=True, text=True)
+                if result.returncode != 0:
                     raise RuntimeError("antiword не установлен или не доступен")
 
                 # Извлекаем текст с помощью antiword
@@ -72,7 +71,7 @@ def extract_doc_to_txt(doc_path, txt_path):
                     if not line:
                         if current_table:
                             for row in current_table:
-                                cells = row.split()  # Разделяем по пробелам, так как antiword не использует '│'
+                                cells = row.split()
                                 while len(cells) < max_columns:
                                     cells.append('')
                                 row_text = '│' + '│'.join(cells) + '│'
@@ -82,7 +81,6 @@ def extract_doc_to_txt(doc_path, txt_path):
                             current_table = []
                             max_columns = 0
                         continue
-                    # Предполагаем, что строки с пробелами между словами могут быть частью таблицы
                     cells = line.split()
                     max_columns = max(max_columns, len(cells))
                     current_table.append(line)
@@ -98,20 +96,8 @@ def extract_doc_to_txt(doc_path, txt_path):
                         logging.debug(f"Извлечена строка таблицы (.doc): {row_text}")
 
             except Exception as e:
-                logging.error(f"Ошибка при обработке .doc файла {doc_path}: {e}")
-                # Fallback на docx2txt, если antiword не сработал
-                try:
-                    text = docx2txt.process(doc_path)
-                    logging.info(f"Fallback: Открыт .doc файл через docx2txt: {doc_path}")
-                    lines = text.splitlines()
-                    for line in lines:
-                        line = line.strip()
-                        if line:
-                            text_lines.append(line)
-                            logging.debug(f"Извлечен текст (.doc, docx2txt): {line}")
-                except Exception as e2:
-                    logging.error(f"Fallback на docx2txt также не удался для {doc_path}: {e2}")
-                    raise e
+                logging.error(f"Ошибка при обработке .doc файла {doc_path} через antiword: {e}")
+                raise
 
         if not text_lines or all(not line.strip() for line in text_lines):
             logging.warning(f"Файл {doc_path} пуст или не содержит полезного текста")
