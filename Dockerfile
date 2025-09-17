@@ -1,8 +1,8 @@
 FROM python:3.9-slim
 
-# Установка libreoffice для конверсии .doc в .docx
+# Установка libreoffice и default-jre для конверсии .doc в .docx
 RUN apt-get update && \
-    apt-get install -y libreoffice-headless && \
+    apt-get install -y libreoffice default-jre && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
