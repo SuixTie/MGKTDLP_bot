@@ -312,23 +312,28 @@ def register_handlers(bot):
             parse_mode='MarkdownV2'
         )
 
+    def escape_markdown_v2(text):
+        """Экранирует специальные символы для MarkdownV2."""
+        special_chars = r'([._*~`\[()\]#+-=|{}.!])'
+        return re.sub(special_chars, r'\\\1', str(text))
+
     @bot.callback_query_handler(func=lambda call: True)
     def callback_handler(call):
         retry_api_call(bot.answer_callback_query, call.id)
         if call.data == "bells":
-            bells_schedule = "**🔔 Расписание звонков 🔔**\n\n" \
-                             "**1 Занятие**: 8:30 \\– 9:15\n\n" \
-                             "**2 Занятие**: 9:25 \\– 10:10\n\n" \
-                             "**3 Занятие**: 10:20 \\– 11:05\n\n" \
-                             "**4 Занятие**: 11:15 \\– 12:00\n\n" \
-                             "**• Большой перерыв** \\(1\\–2 курс\\)\n\n" \
-                             "**5 Занятие** \\(1\\–2 курс\\): 12:55 \\– 13:40\n\n" \
-                             "**5 Занятие** \\(3\\–4 курс\\): 12:10 \\– 12:55\n\n" \
-                             "**• Большой перерыв** \\(3\\–4 курс\\)\n\n" \
-                             "**6 Занятие**: 13:50 \\– 14:35\n\n" \
-                             "**7 Занятие**: 14:45 \\– 15:30\n\n" \
-                             "**8 Занятие**: 15:40 \\– 16:25\n\n" \
-                             "**9 Занятие**: 16:35 \\– 17:20\n\n" \
+            bells_schedule = "**🔔 Расписание звонков 🔔**\\n\\n" \
+                             "**1 Занятие**: 8:30 \\– 9:15\\n\\n" \
+                             "**2 Занятие**: 9:25 \\– 10:10\\n\\n" \
+                             "**3 Занятие**: 10:20 \\– 11:05\\n\\n" \
+                             "**4 Занятие**: 11:15 \\– 12:00\\n\\n" \
+                             "**• Большой перерыв** \\(1\\–2 курс\\)\\n\\n" \
+                             "**5 Занятие** \\(1\\–2 курс\\): 12:55 \\– 13:40\\n\\n" \
+                             "**5 Занятие** \\(3\\–4 курс\\): 12:10 \\– 12:55\\n\\n" \
+                             "**• Большой перерыв** \\(3\\–4 курс\\)\\n\\n" \
+                             "**6 Занятие**: 13:50 \\– 14:35\\n\\n" \
+                             "**7 Занятие**: 14:45 \\– 15:30\\n\\n" \
+                             "**8 Занятие**: 15:40 \\– 16:25\\n\\n" \
+                             "**9 Занятие**: 16:35 \\– 17:20\\n\\n" \
                              "**10 Занятие**: 17:30 \\– 18:15"
             retry_api_call(
                 bot.edit_message_text,
@@ -366,7 +371,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"✅ Группа установлена: {group_id}\nВыберите день недели для просмотра расписания:",
+                    text=f"✅ Группа установлена: {escape_markdown_v2(group_id)}\\nВыберите день недели для просмотра расписания:",
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
@@ -408,7 +413,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"✅ Группа установлена: {group_id}\nВыберите день недели для просмотра расписания:",
+                    text=f"✅ Группа установлена: {escape_markdown_v2(group_id)}\\nВыберите день недели для просмотра расписания:",
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
@@ -417,7 +422,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"✅ Группа установлена: {group_id}",
+                    text=f"✅ Группа установлена: {escape_markdown_v2(group_id)}",
                     reply_markup=get_main_keyboard(),
                     parse_mode='MarkdownV2'
                 )
@@ -500,12 +505,15 @@ def register_handlers(bot):
                 logging.debug(f"Выбран файл для дня {day}: {selected_file}")
                 schedule, date = parse_schedule(selected_file, group_id)
                 if schedule:
-                    response = f"📚 Расписание для группы {group_id} на {day} \\({date}\\):\n\n"
+                    # Исправленный response с экранированием lesson
+                    response = f"📚 Расписание для группы {escape_markdown_v2(group_id)} на {escape_markdown_v2(day)} \\({escape_markdown_v2(date)}\\):\\n\\n"
                     for idx, lesson in enumerate(schedule, start=1):
                         if lesson:
-                            response += f"{idx}\\. {lesson}\n"
+                            lesson_escaped = escape_markdown_v2(lesson)
+                            response += f"{idx}\\. {lesson_escaped}\\n"
                         else:
-                            response += f"{idx}\\. Нет урока\n"
+                            response += f"{idx}\\. Нет урока\\n"
+                    logging.debug(f"Сформированный response: {response}")
                     retry_api_call(
                         bot.edit_message_text,
                         chat_id=call.message.chat.id,
@@ -520,7 +528,7 @@ def register_handlers(bot):
                         bot.edit_message_text,
                         chat_id=call.message.chat.id,
                         message_id=call.message.message_id,
-                        text=f"❌ Группа {group_id} не найдена в расписании на {day}\\.",
+                        text=f"❌ Группа {escape_markdown_v2(group_id)} не найдена в расписании на {escape_markdown_v2(day)}\\.",
                         reply_markup=get_days_keyboard(),
                         parse_mode='MarkdownV2'
                     )
@@ -530,7 +538,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=f"❌ Расписание на {day} не найдено\\.",
+                    text=f"❌ Расписание на {escape_markdown_v2(day)} не найдено\\.",
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
