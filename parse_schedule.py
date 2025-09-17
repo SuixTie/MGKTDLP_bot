@@ -50,7 +50,7 @@ def save_schedule(groups, block_schedule, schedules):
                         subject = subject_match.group(0).rstrip('/').strip()
                         rooms = cleaned[subject_match.end():].strip()
                         rooms = re.sub(r'\bпр', '', rooms)
-                        cleaned = f"{subject} ({rooms})" if rooms else subject
+                        cleaned = f"{subject} \\({rooms}\\)" if rooms else subject  # Экранируем скобки
                     else:
                         subject = cleaned
                         cleaned = subject
@@ -287,7 +287,7 @@ def register_handlers(bot):
         retry_api_call(
             bot.send_message,
             message.chat.id,
-            "Привет! 👋 Я помогу тебе узнать расписание звонков и занятий колледжа\\. Выбери, что тебе нужно:",
+            "Привет\\! 👋 Я помогу тебе узнать расписание звонков и занятий колледжа\\. Выбери, что тебе нужно:",
             reply_markup=get_main_keyboard(),
             parse_mode='MarkdownV2'
         )
