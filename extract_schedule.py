@@ -12,11 +12,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 def extract_doc_to_txt(doc_path, txt_path):
     """
     Извлекает текст из Word файла (.doc или .docx) и сохраняет в TXT файл,
-    сохраняя отступы и структуру параграфов как в оригинале.
-    Удаляет лишние символы перед первым разделителем '│' в строках с колонками.
+    сохраняя структуру таблиц и обрабатывая отступы.
     """
     try:
-        # Проверяем, существует ли входной файл
         if not os.path.exists(doc_path):
             raise FileNotFoundError(f"Файл {doc_path} не найден")
         if not (doc_path.endswith('.doc') or doc_path.endswith('.docx')):
@@ -26,7 +24,6 @@ def extract_doc_to_txt(doc_path, txt_path):
         text_lines = []
 
         if doc_path.endswith('.docx'):
-            # Используем python-docx для .docx
             try:
                 doc = Document(doc_path)
                 logging.info(f"Открыт .docx файл: {doc_path}")
@@ -40,13 +37,16 @@ def extract_doc_to_txt(doc_path, txt_path):
                 # Извлекаем текст из таблиц
                 for table in doc.tables:
                     for row in table.rows:
-                        row_text = '\t'.join(cell.text.strip() for cell in row.cells)
+                        # Сохраняем каждую ячейку отдельно, учитывая возможные объединения
+                        cells = [cell.text.strip() for cell in row.cells]
+                        # Формируем строку с разделителями │
+                        row_text = '│' + '│'.join(cells) + '│'
                         text_lines.append(row_text)
-                    text_lines.append('')
+                    text_lines.append('')  # Пустая строка между таблицами
             except Exception as e:
                 raise ValueError(f"Ошибка при обработке .docx файла {doc_path}: {e}")
         else:
-            # Пробуем antiword для .doc
+            # Обработка .doc файлов
             try:
                 result = subprocess.run(
                     ['antiword', doc_path],
@@ -59,7 +59,6 @@ def extract_doc_to_txt(doc_path, txt_path):
                 text = result.stdout
                 if result.stderr:
                     logging.warning(f"STDERR antiword: {result.stderr}")
-                # Разделяем на строки и обрабатываем
                 for line in text.splitlines():
                     line = line.strip()
                     if '│' in line:
@@ -78,7 +77,6 @@ def extract_doc_to_txt(doc_path, txt_path):
                 except Exception as e:
                     raise ValueError(f"Ошибка при обработке .doc файла {doc_path}: {e}")
 
-        # Проверяем, есть ли содержимое
         if not text_lines or all(not line.strip() for line in text_lines):
             raise ValueError(f"Файл {doc_path} пуст или не содержит полезного текста")
 
