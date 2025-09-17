@@ -88,81 +88,64 @@ def parse_schedule(file_path, group_id):
 
     schedules = {}
     i = 0
+    groups = []
+    block_schedule = []
     while i < len(lines):
         line = lines[i].strip()
         logging.debug(f"Обрабатываем строку {i}: '{line}'")
         if not line:
             i += 1
             continue
-        if line.startswith('┌') or (line.startswith('│') and line.count('│') >= 3):
-            line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
-            cells = [cell.strip() for cell in line.split('│')[1:-1]]
-            logging.debug(f"Ячейки после split: {cells}")
-            is_group_line = cells and all(
-                cell and (
-                    re.match(r'^\d{3,}$', cell) or
-                    re.match(r'^\d+ТО$', cell)
-                ) for cell in cells
-            )
-            logging.debug(f"Это строка с группами? {is_group_line}")
-            if not is_group_line and line.startswith('│'):
-                logging.debug(f"Строка не распознана как группы: {cells}")
-                i += 1
-                continue
-            if i >= len(lines):
-                break
-            group_line = lines[i].strip() if line.startswith('┌') else line
-            group_line = group_line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
-            groups = [id.strip() for id in group_line.split('│')[1:-1] if id.strip()]
-            logging.debug(f"Группы из строки: {groups}")
-            if not groups:
-                i += 1
-                continue
 
-            num_columns = len(groups)
-            i += 1
-            if i >= len(lines):
-                break
-            connector_line = lines[i].strip()
-            logging.debug(f"Строка-коннектор: {connector_line}")
-            if not connector_line.startswith('├'):
-                i += 1
-                continue
+        # Очищаем строку от специальных символов
+        line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
+        cells = [cell.strip() for cell in line.split('│')[1:-1]]
+        logging.debug(f"Ячейки после split: {cells}")
 
-            block_schedule = [[] for _ in range(num_columns)]
-            i += 1
-            while i < len(lines):
-                line = lines[i].strip()
-                logging.debug(f"Обрабатываем строку расписания {i}: {line}")
-                if not line:
-                    i += 1
-                    continue
-                line = line.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
-                cells = [cell.strip() for cell in line.split('│')[1:-1]]
-                if line.startswith('┌') or line.startswith('└'):
-                    if groups and block_schedule:
-                        save_schedule(groups, block_schedule, schedules)
-                    break
-                if line.startswith('│') and line.count('│') >= 3 and all(
-                        cell and (
-                            re.match(r'^\d{3,}$', cell) or
-                            re.match(r'^\d+ТО$', cell)
-                        ) for cell in cells
-                ):
-                    if groups and block_schedule:
-                        save_schedule(groups, block_schedule, schedules)
-                    i -= 1
-                    break
-                if len(cells) != num_columns:
-                    cells += [''] * (num_columns - len(cells))
-                for col, cell in enumerate(cells):
-                    block_schedule[col].append(cell)
-                i += 1
+        # Проверяем, является ли строка строкой с группами
+        is_group_line = cells and all(
+            cell and (
+                re.match(r'^\d{3,}$', cell) or
+                re.match(r'^\d+ТО$', cell)
+            ) for cell in cells
+        )
 
-            if groups and block_schedule and i >= len(lines):
+        if is_group_line:
+            # Сохраняем предыдущую таблицу, если она существует
+            if groups and block_schedule:
                 save_schedule(groups, block_schedule, schedules)
+                logging.debug(f"Сохранено расписание для групп: {groups}")
+            # Инициализируем новую таблицу
+            groups = cells
+            block_schedule = [[] for _ in range(len(groups))]
+            i += 1
+            continue
+
+        # Обрабатываем строки расписания
+        if line.startswith('│') and groups:
+            if len(cells) != len(groups):
+                cells += [''] * (len(groups) - len(cells))  # Дополняем пустыми ячейками
+            for col, cell in enumerate(cells):
+                block_schedule[col].append(cell)
+            i += 1
+            continue
+
+        # Если встретили конец таблицы или начало новой, сохраняем текущую
+        if line.startswith('└') or line.startswith('┌'):
+            if groups and block_schedule:
+                save_schedule(groups, block_schedule, schedules)
+                logging.debug(f"Сохранено расписание для групп: {groups}")
+                groups = []
+                block_schedule = []
+            i += 1
+            continue
 
         i += 1
+
+    # Сохраняем последнюю таблицу, если она существует
+    if groups and block_schedule:
+        save_schedule(groups, block_schedule, schedules)
+        logging.debug(f"Сохранено расписание для групп (конец файла): {groups}")
 
     logging.debug(f"Итоговый словарь schedules: {schedules}")
     group_id = group_id.strip()
