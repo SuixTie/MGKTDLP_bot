@@ -1,13 +1,13 @@
 FROM python:3.9-slim
 
-# Установка antiword и других зависимостей
+# Установка antiword
 RUN apt-get update && \
     apt-get install -y antiword && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Проверка установки antiword
-RUN antiword -v || { echo "antiword installation failed"; exit 1; }
+RUN which antiword || { echo "antiword installation failed"; exit 1; }
 
 # Установка зависимостей Python
 COPY requirements.txt .
