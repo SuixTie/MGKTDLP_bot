@@ -86,6 +86,24 @@ def run_script(script_name):
         logging.error(f"Таймаут выполнения {script_name}: {e}")
         return False
 
+def run_all_scripts_at_startup():
+    """Запускает скрипты при старте программы последовательно."""
+    scripts = ['get_schedule.py', 'extract_schedule.py']
+    success_count = 0
+    for script in scripts:
+        if run_script(script):
+            success_count += 1
+        else:
+            logging.error(f"Скрипт {script} завершился с ошибкой, продолжаем...")
+    # Логируем содержимое extracted_schedules для отладки
+    extracted_dir = "extracted_schedules"
+    if os.path.exists(extracted_dir):
+        files = os.listdir(extracted_dir)
+        logging.info(f"Содержимое папки {extracted_dir}: {files}")
+    else:
+        logging.error(f"Папка {extracted_dir} не существует")
+    logging.info(f"Все скрипты при старте выполнены: {success_count}/{len(scripts)} успешно")
+
 def run_scheduled_task():
     """Выполняет get_schedule.py и, если успешно, extract_schedule.py."""
     if not running:
@@ -94,20 +112,16 @@ def run_scheduled_task():
     success = run_script('get_schedule.py')
     if success:
         logging.info("get_schedule.py завершён успешно, запускаем extract_schedule.py...")
-        run_script('extract_schedule.py')  # Запускаем один раз
+        run_script('extract_schedule.py')
+        # Логируем содержимое extracted_schedules после выполнения
+        extracted_dir = "extracted_schedules"
+        if os.path.exists(extracted_dir):
+            files = os.listdir(extracted_dir)
+            logging.info(f"Содержимое папки {extracted_dir}: {files}")
+        else:
+            logging.error(f"Папка {extracted_dir} не существует")
     else:
         logging.error("get_schedule.py завершился с ошибкой, extract_schedule.py не запускается.")
-
-def run_all_scripts_at_startup():
-    """Запускает скрипты при старте программы."""
-    scripts = ['get_schedule.py', 'extract_schedule.py']
-    success_count = 0
-    for script in scripts:
-        if run_script(script):
-            success_count += 1
-        else:
-            logging.error(f"Скрипт {script} завершился с ошибкой, продолжаем...")
-    logging.info(f"Все скрипты при старте выполнены: {success_count}/{len(scripts)} успешно")
 
 def check_webhook():
     """Проверяет статус webhook'а."""
@@ -157,7 +171,8 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    threading.Thread(target=run_all_scripts_at_startup, daemon=True).start()
+    # Запускаем скрипты последовательно, а не в отдельном потоке
+    run_all_scripts_at_startup()
     threading.Thread(target=run_schedule_in_background, daemon=True).start()
     threading.Thread(target=setup_webhook, daemon=True).start()
 
