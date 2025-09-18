@@ -21,7 +21,7 @@ def convert_doc_to_docx(doc_path, temp_dir):
 
         # Проверяем, существует ли команда libreoffice
         result = subprocess.run(['which', 'libreoffice'], capture_output=True, text=True)
-        if result.return_code != 0:
+        if result.returncode != 0:
             logging.error(f"libreoffice не найден в системе: {result.stderr}")
             return None
         logging.debug(f"libreoffice найден: {result.stdout.strip()}")
@@ -37,7 +37,7 @@ def convert_doc_to_docx(doc_path, temp_dir):
         # Проверяем версию libreoffice
         version_result = subprocess.run(['libreoffice', '--version'], capture_output=True, text=True)
         logging.debug(f"Версия libreoffice: {version_result.stdout.strip()}")
-        if version_result.return_code != 0:
+        if version_result.returncode != 0:
             logging.error(f"Ошибка при проверке версии libreoffice: {version_result.stderr}")
             return None
 
@@ -46,7 +46,7 @@ def convert_doc_to_docx(doc_path, temp_dir):
             ['libreoffice', '--headless', '--convert-to', 'txt', '/app/README.md', '--outdir', temp_dir],
             capture_output=True, text=True, timeout=30
         )
-        logging.debug(f"Тестовая конверсия README.md: stdout={test_result.stdout}, stderr={test_result.stderr}, return_code={test_result.return_code}")
+        logging.debug(f"Тестовая конверсия README.md: stdout={test_result.stdout}, stderr={test_result.stderr}, returncode={test_result.returncode}")
 
         # Запускаем libreoffice для конверсии
         logging.debug(f"Выполняем команду: libreoffice --headless --convert-to docx {doc_path} --outdir {temp_dir}")
@@ -55,12 +55,13 @@ def convert_doc_to_docx(doc_path, temp_dir):
                 ['libreoffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', temp_dir],
                 capture_output=True, text=True, timeout=60
             )
+            logging.debug(f"Тип объекта result: {type(result)}")
             logging.debug(f"Команда libreoffice: {result.args}")
             logging.debug(f"Вывод libreoffice (stdout): {result.stdout}")
             logging.debug(f"Ошибки libreoffice (stderr): {result.stderr}")
-            logging.debug(f"Код возврата libreoffice: {result.return_code}")
+            logging.debug(f"Код возврата libreoffice: {result.returncode}")
 
-            if result.return_code != 0:
+            if result.returncode != 0:
                 logging.error(f"Ошибка конверсии {doc_path} в .docx: {result.stderr}")
                 return None
 
