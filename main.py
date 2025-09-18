@@ -9,8 +9,8 @@ import threading
 from dotenv import load_dotenv
 import signal
 import logging
-import parse_schedule  # Импортируем parse_schedule как модуль
-import requests  # Для проверки webhook'а
+import parse_schedule
+import requests
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -149,7 +149,7 @@ def setup_webhook():
         try:
             bot.set_webhook(url=webhook_url)
             logging.info(f"Webhook успешно установлен: {webhook_url}")
-            check_webhook()  # Проверяем статус после установки
+            check_webhook()
         except Exception as e:
             logging.error(f"Ошибка установки webhook: {e}")
 
@@ -171,7 +171,6 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Запускаем скрипты последовательно, а не в отдельном потоке
     run_all_scripts_at_startup()
     threading.Thread(target=run_schedule_in_background, daemon=True).start()
     threading.Thread(target=setup_webhook, daemon=True).start()
@@ -186,7 +185,6 @@ def main():
 
 def run_schedule_in_background():
     """Запускает schedule в фоновом потоке."""
-    # Планируем задачи на 08:00 и 20:00
     schedule.every().day.at("08:00").do(run_scheduled_task)
     schedule.every().day.at("20:00").do(run_scheduled_task)
     while running:
