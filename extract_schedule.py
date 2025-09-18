@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import tempfile
+import shutil
 from docx import Document
 import logging
 
@@ -120,18 +121,18 @@ def extract_doc_to_txt(doc_path, txt_path):
                 max_columns = max(len(row.cells) for row in table.rows)
                 logging.debug(f"Обработка таблицы с {max_columns} столбцами")
                 for row in table.rows:
-                    cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
+                    cells = [cell.text.strip().replace('\n', ' ').replace('/', '|') for cell in row.cells]
                     # Обработка объединённых ячеек
                     merged_cells = []
                     col_idx = 0
                     for cell in row.cells:
                         if cell._tc.grid_span > 1 or cell._tc.vMerge:
-                            merged_cells.append(cell.text.strip().replace('\n', ' '))
+                            merged_cells.append(cell.text.strip().replace('\n', ' ').replace('/', '|'))
                             for _ in range(cell._tc.grid_span - 1):
                                 merged_cells.append('')
                                 col_idx += 1
                         else:
-                            merged_cells.append(cell.text.strip().replace('\n', ' '))
+                            merged_cells.append(cell.text.strip().replace('\n', ' ').replace('/', '|'))
                         col_idx += 1
                     while len(merged_cells) < max_columns:
                         merged_cells.append('')
@@ -146,7 +147,10 @@ def extract_doc_to_txt(doc_path, txt_path):
             if temp_dir:
                 if os.path.exists(temp_docx_path):
                     os.remove(temp_docx_path)
-                os.rmdir(temp_dir)
+                    logging.debug(f"Удалён временный файл: {temp_docx_path}")
+                # Рекурсивно удаляем временную директорию
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                logging.debug(f"Удалена временная директория: {temp_dir}")
 
         if not text_lines or all(not line.strip() for line in text_lines):
             logging.warning(f"Файл {doc_path} пуст или не содержит полезного текста")
