@@ -330,30 +330,40 @@ def register_handlers(bot):
         retry_api_call(bot.answer_callback_query, call.id)
         if call.data == "bells":
             bells_schedule = (
-                "**🔔 Расписание звонков 🔔**\n\n"
-                "**1 Занятие**: 8:30 - 9:15\n\n"
-                "**2 Занятие**: 9:25 - 10:10\n\n"
-                "**3 Занятие**: 10:20 - 11:05\n\n"
-                "**4 Занятие**: 11:15 - 12:00\n\n"
-                "**Большой перерыв (1-2 курс)**\n\n"
-                "**5 Занятие (1-2 курс)**:" " 12:55 - 13:40\n"
-                "**5 Занятие (3-4 курс)**:" " 12:10 - 12:55\n\n"
-                "**Большой перерыв (3-4 курс)**\n\n"
-                "**6 Занятие**: 13:50 - 14:35\n\n"
-                "**7 Занятие**: 14:45 - 15:30\n\n"
-                "**8 Занятие**: 15:40 - 16:25\n\n"
-                "**9 Занятие**: 16:35 - 17:20\n\n"
-                "**10 Занятие**: 17:30 - 18:15"
+                "<b>🔔 Расписание звонков 🔔</b><br><br>"
+                "<b>1 Занятие</b>: 8:30 - 9:15<br><br>"
+                "<b>2 Занятие</b>: 9:25 - 10:10<br><br>"
+                "<b>3 Занятие</b>: 10:20 - 11:05<br><br>"
+                "<b>4 Занятие</b>: 11:15 - 12:00<br><br>"
+                "<b>* Большой перерыв (1-2 курс)</b><br><br>"
+                "<b>5 Занятие (1-2 курс)</b>: 12:55 - 13:40<br>"
+                "<b>5 Занятие (3-4 курс)</b>: 12:10 - 12:55<br>"
+                "<b>* Большой перерыв (3-4 курс)</b><br><br>"
+                "<b>6 Занятие</b>: 13:50 - 14:35<br><br>"
+                "<b>7 Занятие</b>: 14:45 - 15:30<br><br>"
+                "<b>8 Занятие</b>: 15:40 - 16:25<br><br>"
+                "<b>9 Занятие</b>: 16:35 - 17:20<br><br>"
+                "<b>10 Занятие</b>: 17:30 - 18:15"
             )
-            retry_api_call(
-                bot.edit_message_text,
-                chat_id=call.message.chat.id,
-                message_id=call.message.message_id,
-                text=escape_markdown_v2(bells_schedule),
-                reply_markup=InlineKeyboardMarkup().add(
-                    InlineKeyboardButton("🔙 Вернуться назад", callback_data="back_main")),
-                parse_mode='MarkdownV2'
-            )
+            logging.debug(f"bells_schedule before sending: {bells_schedule}")
+            try:
+                retry_api_call(
+                    bot.edit_message_text,
+                    chat_id=call.message.chat.id,
+                    message_id=call.message.message_id,
+                    text=bells_schedule,
+                    reply_markup=InlineKeyboardMarkup().add(
+                        InlineKeyboardButton("🔙 Вернуться назад", callback_data="back_main")),
+                    parse_mode='HTML'
+                )
+            except Exception as e:
+                logging.error(f"Ошибка при отправке bells_schedule: {e}")
+                retry_api_call(
+                    bot.send_message,
+                    call.message.chat.id,
+                    text="❌ Ошибка при отображении расписания звонков. Попробуйте позже.",
+                    parse_mode='MarkdownV2'
+                )
         elif call.data == "lessons":
             groups = get_available_groups()
             logging.debug(f"Callback 'lessons', доступные группы: {groups}")
