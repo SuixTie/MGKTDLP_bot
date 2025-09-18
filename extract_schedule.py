@@ -26,7 +26,7 @@ def convert_doc_to_docx(doc_path, temp_dir):
             return None
         logging.debug(f"libreoffice найден: {result.stdout.strip()}")
 
-        # Проверяем права доступа к временной директории и входному файлу
+        # Проверяем права доступа
         if not os.access(temp_dir, os.W_OK):
             logging.error(f"Нет прав на запись в {temp_dir}")
             return None
@@ -41,6 +41,13 @@ def convert_doc_to_docx(doc_path, temp_dir):
             logging.error(f"Ошибка при проверке версии libreoffice: {version_result.stderr}")
             return None
 
+        # Проверяем работоспособность libreoffice
+        test_result = subprocess.run(
+            ['libreoffice', '--headless', '--convert-to', 'txt', '/app/README.md', '--outdir', temp_dir],
+            capture_output=True, text=True, timeout=30
+        )
+        logging.debug(f"Тестовая конверсия README.md: stdout={test_result.stdout}, stderr={test_result.stderr}, return_code={test_result.return_code}")
+
         # Запускаем libreoffice для конверсии
         logging.debug(f"Выполняем команду: libreoffice --headless --convert-to docx {doc_path} --outdir {temp_dir}")
         try:
@@ -48,25 +55,24 @@ def convert_doc_to_docx(doc_path, temp_dir):
                 ['libreoffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', temp_dir],
                 capture_output=True, text=True, timeout=60
             )
+            logging.debug(f"Команда libreoffice: {result.args}")
+            logging.debug(f"Вывод libreoffice (stdout): {result.stdout}")
+            logging.debug(f"Ошибки libreoffice (stderr): {result.stderr}")
+            logging.debug(f"Код возврата libreoffice: {result.return_code}")
+
+            if result.return_code != 0:
+                logging.error(f"Ошибка конверсии {doc_path} в .docx: {result.stderr}")
+                return None
+
+            if not os.path.exists(temp_docx_path):
+                logging.error(f"Файл {temp_docx_path} не был создан")
+                return None
+
+            logging.info(f"Успешно сконвертирован {doc_path} в {temp_docx_path}")
+            return temp_docx_path
         except Exception as e:
             logging.error(f"Исключение при выполнении libreoffice: {type(e).__name__}: {str(e)}")
             return None
-
-        logging.debug(f"Команда libreoffice: {result.args}")
-        logging.debug(f"Вывод libreoffice (stdout): {result.stdout}")
-        logging.debug(f"Ошибки libreoffice (stderr): {result.stderr}")
-        logging.debug(f"Код возврата libreoffice: {result.return_code}")
-
-        if result.return_code != 0:
-            logging.error(f"Ошибка конверсии {doc_path} в .docx: {result.stderr}")
-            return None
-
-        if not os.path.exists(temp_docx_path):
-            logging.error(f"Файл {temp_docx_path} не был создан")
-            return None
-
-        logging.info(f"Успешно сконвертирован {doc_path} в {temp_docx_path}")
-        return temp_docx_path
     except subprocess.TimeoutExpired:
         logging.error(f"Таймаут при конверсии {doc_path}")
         return None
@@ -114,7 +120,7 @@ def extract_doc_to_txt(doc_path, txt_path):
                 logging.debug(f"Обработка таблицы с {max_columns} столбцами")
                 for row in table.rows:
                     cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
-                    # Обработка объединённых ячеек (merged cells)
+                    # Обработка объединённых ячеек
                     merged_cells = []
                     col_idx = 0
                     for cell in row.cells:
@@ -126,7 +132,6 @@ def extract_doc_to_txt(doc_path, txt_path):
                         else:
                             merged_cells.append(cell.text.strip().replace('\n', ' '))
                         col_idx += 1
-                    # Заполняем до max_columns
                     while len(merged_cells) < max_columns:
                         merged_cells.append('')
                     row_text = '│' + '│'.join(merged_cells) + '│'
@@ -137,7 +142,6 @@ def extract_doc_to_txt(doc_path, txt_path):
             logging.error(f"Ошибка при обработке файла {temp_docx_path}: {e}")
             raise
         finally:
-            # Удаляем временные файлы
             if temp_dir:
                 if os.path.exists(temp_docx_path):
                     os.remove(temp_docx_path)
