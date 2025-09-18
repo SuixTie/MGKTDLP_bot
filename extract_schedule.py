@@ -140,17 +140,24 @@ def extract_doc_to_txt(doc_path, txt_path):
                     text_lines.append(row_text)
                     logging.debug(f"Извлечена строка таблицы: {row_text}")
                 text_lines.append('')
+
         except Exception as e:
             logging.error(f"Ошибка при обработке файла {temp_docx_path}: {e}")
             raise
         finally:
             if temp_dir:
                 if os.path.exists(temp_docx_path):
-                    os.remove(temp_docx_path)
-                    logging.debug(f"Удалён временный файл: {temp_docx_path}")
+                    try:
+                        os.remove(temp_docx_path)
+                        logging.debug(f"Удалён временный файл: {temp_docx_path}")
+                    except Exception as e:
+                        logging.error(f"Ошибка при удалении {temp_docx_path}: {e}")
                 # Рекурсивно удаляем временную директорию
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                logging.debug(f"Удалена временная директория: {temp_dir}")
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    logging.debug(f"Удалена временная директория: {temp_dir}")
+                except Exception as e:
+                    logging.error(f"Ошибка при удалении {temp_dir}: {e}")
 
         if not text_lines or all(not line.strip() for line in text_lines):
             logging.warning(f"Файл {doc_path} пуст или не содержит полезного текста")
