@@ -50,22 +50,38 @@ def save_schedule(groups, block_schedule, schedules):
             lessons = []
             for lesson in block_schedule[col]:
                 if lesson:
+                    # Удаляем ведущие цифры (например, "1 ")
                     cleaned = re.sub(r'^\d+\s*', '', lesson).strip()
                     cleaned = re.sub(r'\s+', ' ', cleaned.replace('\xa0', ' '))
-                    cleaned = cleaned.replace('/', '|')
                     # Проверяем, начинается ли урок с -------
-                    if cleaned.startswith('-------|') or cleaned == '-------':
+                    if cleaned.startswith('-------') or cleaned == '-------':
                         lessons.append('')
                         continue
-                    subject_pattern = r'^[^0-9|]*'
-                    subject_match = re.search(subject_pattern, cleaned)
-                    if subject_match and subject_match.group(0).strip():
-                        subject = subject_match.group(0).rstrip('|').strip()
-                        rooms = cleaned[subject_match.end():].strip()
-                        rooms = re.sub(r'\bпр', '', rooms)
-                        cleaned = f"{subject} ({rooms})" if rooms else subject
+                    # Обрабатываем случаи вроде "ИнЯ/ИнЯ309/323"
+                    concatenated_pattern = r'^([^0-9|]+?)([0-9/]+)$'
+                    concatenated_match = re.match(concatenated_pattern, cleaned)
+                    if concatenated_match:
+                        subject = concatenated_match.group(1).strip()
+                        rooms = concatenated_match.group(2).strip()
+                        # Заменяем | на / в предметах, если нужно
+                        subject = subject.replace('|', '/')
+                        # Добавляем "каб." к номерам аудиторий
+                        cleaned = f"{subject} ({rooms}каб.)"
                     else:
-                        cleaned = cleaned
+                        # Стандартная обработка: разделяем предмет и аудиторию
+                        subject_pattern = r'^[^0-9|]*'
+                        subject_match = re.search(subject_pattern, cleaned)
+                        if subject_match and subject_match.group(0).strip():
+                            subject = subject_match.group(0).rstrip('|').strip()
+                            rooms = cleaned[subject_match.end():].strip()
+                            rooms = re.sub(r'\bпр', '', rooms)
+                            # Заменяем | на / в предметах, если нужно
+                            subject = subject.replace('|', '/')
+                            # Добавляем "каб." к номерам аудиторий
+                            cleaned = f"{subject} ({rooms}каб.)" if rooms else subject
+                        else:
+                            # Если нет разделения на предмет и аудиторию
+                            cleaned = cleaned.replace('|', '/')
                     lessons.append(cleaned)
                 else:
                     lessons.append('')
@@ -337,7 +353,7 @@ def register_handlers(bot):
                 "<b>4 Занятие</b>: 11:15 - 12:00\n\n"
                 "<b>* Большой перерыв (1-2 курс)</b>\n\n"
                 "<b>5 Занятие (1-2 курс)</b>: 12:55 - 13:40\n"
-                "<b>5 Занятие (3-4 курс)</b>: 12:10 - 12:55\n"
+                "<b>5 Занятие (3-4 курс)</b>: 12:10 - 12:55\n\n"
                 "<b>* Большой перерыв (3-4 курс)</b>\n\n"
                 "<b>6 Занятие</b>: 13:50 - 14:35\n\n"
                 "<b>7 Занятие</b>: 14:45 - 15:30\n\n"
