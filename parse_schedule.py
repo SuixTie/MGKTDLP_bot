@@ -44,13 +44,15 @@ def save_schedule(groups, block_schedule, schedules):
                 if lesson:
                     cleaned = re.sub(r'^\d+\s*', '', lesson).strip()
                     cleaned = re.sub(r'\s+', ' ', cleaned.replace('\xa0', ' '))
-                    subject_pattern = r'^[^0-9]*'
+                    # Заменяем / на |, чтобы избежать конфликтов
+                    cleaned = cleaned.replace('/', '|')
+                    subject_pattern = r'^[^0-9|]*'
                     subject_match = re.search(subject_pattern, cleaned)
                     if subject_match and subject_match.group(0).strip():
-                        subject = subject_match.group(0).rstrip('/').strip()
+                        subject = subject_match.group(0).rstrip('|').strip()
                         rooms = cleaned[subject_match.end():].strip()
                         rooms = re.sub(r'\bпр', '', rooms)
-                        cleaned = f"{subject} ({rooms})" if rooms else subject  # Без экранирования
+                        cleaned = f"{subject} ({rooms})" if rooms else subject
                     else:
                         subject = cleaned
                         cleaned = subject
