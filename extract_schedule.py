@@ -26,25 +26,36 @@ def convert_doc_to_docx(doc_path, temp_dir):
             return None
         logging.debug(f"libreoffice найден: {result.stdout.strip()}")
 
-        # Проверяем права доступа к временной директории
+        # Проверяем права доступа к временной директории и входному файлу
         if not os.access(temp_dir, os.W_OK):
             logging.error(f"Нет прав на запись в {temp_dir}")
             return None
-
-        # Проверяем права доступа к входному файлу
         if not os.access(doc_path, os.R_OK):
             logging.error(f"Нет прав на чтение {doc_path}")
             return None
 
+        # Проверяем версию libreoffice
+        version_result = subprocess.run(['libreoffice', '--version'], capture_output=True, text=True)
+        logging.debug(f"Версия libreoffice: {version_result.stdout.strip()}")
+        if version_result.return_code != 0:
+            logging.error(f"Ошибка при проверке версии libreoffice: {version_result.stderr}")
+            return None
+
         # Запускаем libreoffice для конверсии
         logging.debug(f"Выполняем команду: libreoffice --headless --convert-to docx {doc_path} --outdir {temp_dir}")
-        result = subprocess.run(
-            ['libreoffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', temp_dir],
-            capture_output=True, text=True, timeout=60
-        )
+        try:
+            result = subprocess.run(
+                ['libreoffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', temp_dir],
+                capture_output=True, text=True, timeout=60
+            )
+        except Exception as e:
+            logging.error(f"Исключение при выполнении libreoffice: {type(e).__name__}: {str(e)}")
+            return None
+
         logging.debug(f"Команда libreoffice: {result.args}")
         logging.debug(f"Вывод libreoffice (stdout): {result.stdout}")
         logging.debug(f"Ошибки libreoffice (stderr): {result.stderr}")
+        logging.debug(f"Код возврата libreoffice: {result.return_code}")
 
         if result.return_code != 0:
             logging.error(f"Ошибка конверсии {doc_path} в .docx: {result.stderr}")
