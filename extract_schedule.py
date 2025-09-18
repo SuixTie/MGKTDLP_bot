@@ -20,11 +20,24 @@ def convert_doc_to_docx(doc_path, temp_dir):
         logging.info(f"Конвертируем {doc_path} в {temp_docx_path} с помощью libreoffice")
 
         # Проверяем, существует ли команда libreoffice
-        if subprocess.run(['which', 'libreoffice'], capture_output=True, text=True).return_code != 0:
-            logging.error("libreoffice не найден в системе")
+        result = subprocess.run(['which', 'libreoffice'], capture_output=True, text=True)
+        if result.return_code != 0:
+            logging.error(f"libreoffice не найден в системе: {result.stderr}")
+            return None
+        logging.debug(f"libreoffice найден: {result.stdout.strip()}")
+
+        # Проверяем права доступа к временной директории
+        if not os.access(temp_dir, os.W_OK):
+            logging.error(f"Нет прав на запись в {temp_dir}")
+            return None
+
+        # Проверяем права доступа к входному файлу
+        if not os.access(doc_path, os.R_OK):
+            logging.error(f"Нет прав на чтение {doc_path}")
             return None
 
         # Запускаем libreoffice для конверсии
+        logging.debug(f"Выполняем команду: libreoffice --headless --convert-to docx {doc_path} --outdir {temp_dir}")
         result = subprocess.run(
             ['libreoffice', '--headless', '--convert-to', 'docx', doc_path, '--outdir', temp_dir],
             capture_output=True, text=True, timeout=60
@@ -47,7 +60,7 @@ def convert_doc_to_docx(doc_path, temp_dir):
         logging.error(f"Таймаут при конверсии {doc_path}")
         return None
     except Exception as e:
-        logging.error(f"Ошибка при конверсии {doc_path} в .docx: {e}")
+        logging.error(f"Ошибка при конверсии {doc_path} в .docx: {type(e).__name__}: {str(e)}")
         return None
 
 def extract_doc_to_txt(doc_path, txt_path):
