@@ -52,6 +52,10 @@ def save_schedule(groups, block_schedule, schedules):
                         subject = subject_match.group(0).rstrip('|').strip()
                         rooms = cleaned[subject_match.end():].strip()
                         rooms = re.sub(r'\bпр', '', rooms)
+                        # Обрабатываем случаи вроде ------- как пустой урок
+                        if subject == '-------':
+                            lessons.append('')
+                            continue
                         cleaned = f"{subject} ({rooms})" if rooms else subject
                     else:
                         subject = cleaned
