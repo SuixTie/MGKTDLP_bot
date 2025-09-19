@@ -35,9 +35,7 @@ def retry_api_call(func, *args, retries=3, delay=1, **kwargs):
 
 def escape_markdown_v2(text):
     """Экранирует специальные символы для MarkdownV2, исключая * для полужирного начертания."""
-    # Заменяем en dash (–) на дефис (-) и bullet (•) на *
     text = text.replace('–', '-').replace('•', '*')
-    # Экранируем все специальные символы, кроме *
     special_chars = r'([_~`\[()\]#+-=|{.}!])'
     return re.sub(special_chars, r'\\\1', str(text))
 
@@ -50,37 +48,28 @@ def save_schedule(groups, block_schedule, schedules):
             lessons = []
             for lesson in block_schedule[col]:
                 if lesson:
-                    # Удаляем ведущие цифры (например, "1 ")
                     cleaned = re.sub(r'^\d+\s*', '', lesson).strip()
                     cleaned = re.sub(r'\s+', ' ', cleaned.replace('\xa0', ' '))
-                    # Проверяем, начинается ли урок с -------
                     if cleaned.startswith('-------') or cleaned == '-------':
                         lessons.append('')
                         continue
-                    # Обрабатываем случаи вроде "ИнЯ/ИнЯ309/323"
                     concatenated_pattern = r'^([^0-9|]+?)([0-9/]+)$'
                     concatenated_match = re.match(concatenated_pattern, cleaned)
                     if concatenated_match:
                         subject = concatenated_match.group(1).strip()
                         rooms = concatenated_match.group(2).strip()
-                        # Заменяем | на / в предметах, если нужно
                         subject = subject.replace('|', '/')
-                        # Добавляем "каб." к номерам аудиторий
                         cleaned = f"{subject} ({rooms}каб.)"
                     else:
-                        # Стандартная обработка: разделяем предмет и аудиторию
                         subject_pattern = r'^[^0-9|]*'
                         subject_match = re.search(subject_pattern, cleaned)
                         if subject_match and subject_match.group(0).strip():
                             subject = subject_match.group(0).rstrip('|').strip()
                             rooms = cleaned[subject_match.end():].strip()
                             rooms = re.sub(r'\bпр', '', rooms)
-                            # Заменяем | на / в предметах, если нужно
                             subject = subject.replace('|', '/')
-                            # Добавляем "каб." к номерам аудиторий
                             cleaned = f"{subject} ({rooms}каб.)" if rooms else subject
                         else:
-                            # Если нет разделения на предмет и аудиторию
                             cleaned = cleaned.replace('|', '/')
                     lessons.append(cleaned)
                 else:
@@ -541,21 +530,26 @@ def register_handlers(bot):
                 logging.debug(f"Выбран файл для дня {day}: {selected_file}")
                 schedule, date = parse_schedule(selected_file, group_id)
                 if schedule:
-                    response = f"📚 Расписание для группы {group_id} на {day} ({date}):\n\n"
+                    response = f"📚 Расписание для группы <b>{group_id}</b> на <b>{day}</b> ({date}):\n\n"
                     for idx, lesson in enumerate(schedule, start=1):
                         if lesson:
-                            response += f"{idx}. {lesson}\n"
+                            # Разделяем предмет и аудиторию
+                            match = re.match(r'^(.*?)\s*\((.*?)\)каб\.$', lesson)
+                            if match:
+                                subject, room = match.groups()
+                                response += f"<b>{idx}</b>. {subject} – <b>{room}</b> каб.\n"
+                            else:
+                                response += f"<b>{idx}</b>. {lesson}\n"
                         else:
-                            response += f"{idx}. Нет урока\n"
-                    escaped_response = escape_markdown_v2(response)
-                    logging.debug(f"Сформированный response: {escaped_response}")
+                            response += f"<b>{idx}</b>. Нет урока\n"
+                    logging.debug(f"Сформированный response: {response}")
                     retry_api_call(
                         bot.edit_message_text,
                         chat_id=call.message.chat.id,
                         message_id=call.message.message_id,
-                        text=escaped_response,
+                        text=response,
                         reply_markup=get_days_keyboard(),
-                        parse_mode='MarkdownV2'
+                        parse_mode='HTML'
                     )
                 else:
                     logging.warning(f"Не удалось найти расписание для группы {group_id} на {day}")
