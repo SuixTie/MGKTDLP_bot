@@ -65,8 +65,8 @@ def save_schedule(groups, block_schedule, schedules):
                         rooms = concatenated_match.group(2).strip()
                         # Заменяем | на / в предметах, если нужно
                         subject = subject.replace('|', '/')
-                        # Форматируем без скобок
-                        cleaned = f"{subject} – {rooms} каб."
+                        # Добавляем "каб." к номерам аудиторий
+                        cleaned = f"{subject} ({rooms}каб.)"
                     else:
                         # Стандартная обработка: разделяем предмет и аудиторию
                         subject_pattern = r'^[^0-9|]*'
@@ -77,8 +77,8 @@ def save_schedule(groups, block_schedule, schedules):
                             rooms = re.sub(r'\bпр', '', rooms)
                             # Заменяем | на / в предметах, если нужно
                             subject = subject.replace('|', '/')
-                            # Форматируем без скобок
-                            cleaned = f"{subject} – {rooms} каб." if rooms else subject
+                            # Добавляем "каб." к номерам аудиторий
+                            cleaned = f"{subject} ({rooms}каб.)" if rooms else subject
                         else:
                             # Если нет разделения на предмет и аудиторию
                             cleaned = cleaned.replace('|', '/')
@@ -407,7 +407,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=escape_markdown_v2(f"✅ Группа установлена: *{group_id}*\nВыберите день недели для просмотра расписания:"),
+                    text=escape_markdown_v2(f"✅ Группа установлена: {group_id}\nВыберите день недели для просмотра расписания:"),
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
@@ -449,7 +449,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=escape_markdown_v2(f"✅ Группа установлена: *{group_id}*\nВыберите день недели для просмотра расписания:"),
+                    text=escape_markdown_v2(f"✅ Группа установлена: {group_id}\nВыберите день недели для просмотра расписания:"),
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
@@ -458,7 +458,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=escape_markdown_v2(f"✅ Группа установлена: *{group_id}*"),
+                    text=escape_markdown_v2(f"✅ Группа установлена: {group_id}"),
                     reply_markup=get_main_keyboard(),
                     parse_mode='MarkdownV2'
                 )
@@ -541,18 +541,12 @@ def register_handlers(bot):
                 logging.debug(f"Выбран файл для дня {day}: {selected_file}")
                 schedule, date = parse_schedule(selected_file, group_id)
                 if schedule:
-                    response = f"📚 Расписание для группы *{group_id}* на *{day}* ({date}):\n\n"
+                    response = f"📚 Расписание для группы {group_id} на {day} ({date}):\n\n"
                     for idx, lesson in enumerate(schedule, start=1):
                         if lesson:
-                            # Разделяем предмет и аудиторию для применения полужирного шрифта к номеру кабинета
-                            parts = lesson.split(' – ')
-                            if len(parts) == 2:
-                                subject, room = parts
-                                response += f"*{idx}.* {subject} – *{room}*\n"
-                            else:
-                                response += f"*{idx}.* {lesson}\n"
+                            response += f"{idx}. {lesson}\n"
                         else:
-                            response += f"*{idx}.* Нет урока\n"
+                            response += f"{idx}. Нет урока\n"
                     escaped_response = escape_markdown_v2(response)
                     logging.debug(f"Сформированный response: {escaped_response}")
                     retry_api_call(
@@ -569,7 +563,7 @@ def register_handlers(bot):
                         bot.edit_message_text,
                         chat_id=call.message.chat.id,
                         message_id=call.message.message_id,
-                        text=escape_markdown_v2(f"❌ Группа *{group_id}* не найдена в расписании на *{day}*."),
+                        text=escape_markdown_v2(f"❌ Группа {group_id} не найдена в расписании на {day}."),
                         reply_markup=get_days_keyboard(),
                         parse_mode='MarkdownV2'
                     )
@@ -579,7 +573,7 @@ def register_handlers(bot):
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text=escape_markdown_v2(f"❌ Расписание на *{day}* не найдено."),
+                    text=escape_markdown_v2(f"❌ Расписание на {day} не найдено."),
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
