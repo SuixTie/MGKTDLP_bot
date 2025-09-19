@@ -337,7 +337,7 @@ def register_handlers(bot):
             bot.send_message,
             message.chat.id,
             escape_markdown_v2("🔄 Выберите новую группу:"),
-            reply_markup=get_groups_keyboard(groups, context="select", page=1),
+            reply_markup=get_groups_keyboard(groups, context="lessons", page=1),
             parse_mode='MarkdownV2'
         )
 
@@ -444,7 +444,7 @@ def register_handlers(bot):
             context = parts[2]
             user_groups[call.from_user.id] = group_id
             logging.debug(f"Выбрана группа: {group_id}, контекст: {context}")
-            if context == "lessons":
+            if context in ["lessons", "change_group"]:
                 retry_api_call(
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
@@ -453,7 +453,7 @@ def register_handlers(bot):
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
-            else:
+            else:  # context == "select"
                 retry_api_call(
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
@@ -509,7 +509,7 @@ def register_handlers(bot):
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 text=escape_markdown_v2("🔄 Выберите новую группу:"),
-                reply_markup=get_groups_keyboard(groups, context="select", page=1),
+                reply_markup=get_groups_keyboard(groups, context="change_group", page=1),
                 parse_mode='MarkdownV2'
             )
         elif call.data == "back_main":
