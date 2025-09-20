@@ -288,7 +288,7 @@ def get_groups_keyboard(groups, context="select", page=1):
     nav_buttons.append(InlineKeyboardButton("🔙 Вернуться", callback_data="back_main"))
     if nav_buttons:
         keyboard.row(*nav_buttons)
-    logging.debug(f"Создана клавиатура групп с контекстом: {context}, страница: {page}, группы: {current_groups}")
+    logging.debug(f"Создана клавиатура групп с контекстом: {context}, страница: {page}, группы: {current_groups}, callback для групп: {[f'group_{g}_{context}' for g in current_groups]}")
     return keyboard
 
 def get_days_keyboard():
@@ -471,8 +471,9 @@ def register_handlers(bot):
                     parse_mode='MarkdownV2'
                 )
         elif call.data.startswith("page_"):
-            parts = call.data.split('_')
+            parts = call.data.split('_', 2)
             if len(parts) < 3:
+                logging.error(f"Неверный формат callback-данных для страницы: {call.data}")
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
