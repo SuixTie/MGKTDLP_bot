@@ -57,16 +57,18 @@ def save_schedule(groups, block_schedule, schedules):
                     if cleaned.startswith('-------') or cleaned == '-------':
                         lessons.append('')
                         continue
-                    # Обрабатываем случаи вроде "ИнЯ/ИнЯ309/323"
+                    # Обрабатываем случаи вроде "ИнЯ/ИнЯ309/323" или "ОхрОкрСр/э/306"
                     concatenated_pattern = r'^([^0-9|]+?)([0-9/]+)$'
                     concatenated_match = re.match(concatenated_pattern, cleaned)
                     if concatenated_match:
                         subject = concatenated_match.group(1).strip()
                         rooms = concatenated_match.group(2).strip()
+                        # Удаляем ведущий слеш из rooms, если он есть
+                        rooms = rooms.lstrip('/')
                         # Заменяем | на / в предметах, если нужно
                         subject = subject.replace('|', '/')
                         # Форматируем без скобок
-                        cleaned = f"{subject} – {rooms} каб."
+                        cleaned = f"{subject} – {rooms} каб." if rooms else subject
                     else:
                         # Стандартная обработка: разделяем предмет и аудиторию
                         subject_pattern = r'^[^0-9|]*'
@@ -75,6 +77,8 @@ def save_schedule(groups, block_schedule, schedules):
                             subject = subject_match.group(0).rstrip('|').strip()
                             rooms = cleaned[subject_match.end():].strip()
                             rooms = re.sub(r'\bпр', '', rooms)
+                            # Удаляем ведущий слеш из rooms, если он есть
+                            rooms = rooms.lstrip('/')
                             # Заменяем | на / в предметах, если нужно
                             subject = subject.replace('|', '/')
                             # Форматируем без скобок
