@@ -345,6 +345,7 @@ def register_handlers(bot):
     @bot.callback_query_handler(func=lambda call: True)
     def callback_handler(call):
         retry_api_call(bot.answer_callback_query, call.id)
+        logging.debug(f"Получены callback-данные: {call.data}")
         if call.data == "bells":
             bells_schedule = (
                 "<b>🔔 Расписание звонков 🔔</b>\n\n"
@@ -432,7 +433,7 @@ def register_handlers(bot):
                 parse_mode='MarkdownV2'
             )
         elif call.data.startswith("group_"):
-            parts = call.data.split('_')
+            parts = call.data.split('_', 2)
             if len(parts) < 3:
                 logging.error(f"Неверный формат callback-данных: {call.data}")
                 retry_api_call(
@@ -444,7 +445,7 @@ def register_handlers(bot):
                 return
             group_id = parts[1]
             context = parts[2]
-            logging.debug(f"Callback данные: {call.data}, Выбрана группа: {group_id}, контекст: {context}")
+            logging.debug(f"Callback данные: {call.data}, Разобранные части: {parts}, Выбрана группа: {group_id}, контекст: {context}")
             user_groups[call.from_user.id] = group_id
             if context in ["lessons", "change_group"]:
                 logging.debug(f"Перенаправление в меню выбора дня недели для группы {group_id} (контекст: {context})")
