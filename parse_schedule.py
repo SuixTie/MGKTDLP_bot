@@ -288,6 +288,7 @@ def get_groups_keyboard(groups, context="select", page=1):
     nav_buttons.append(InlineKeyboardButton("🔙 Вернуться", callback_data="back_main"))
     if nav_buttons:
         keyboard.row(*nav_buttons)
+    logging.debug(f"Создана клавиатура групп с контекстом: {context}, страница: {page}, группы: {current_groups}")
     return keyboard
 
 def get_days_keyboard():
@@ -433,6 +434,7 @@ def register_handlers(bot):
         elif call.data.startswith("group_"):
             parts = call.data.split('_')
             if len(parts) < 3:
+                logging.error(f"Неверный формат callback-данных: {call.data}")
                 retry_api_call(
                     bot.send_message,
                     call.message.chat.id,
@@ -442,8 +444,8 @@ def register_handlers(bot):
                 return
             group_id = parts[1]
             context = parts[2]
+            logging.debug(f"Callback данные: {call.data}, Выбрана группа: {group_id}, контекст: {context}")
             user_groups[call.from_user.id] = group_id
-            logging.debug(f"Выбрана группа: {group_id}, контекст: {context}")
             if context in ["lessons", "change_group"]:
                 logging.debug(f"Перенаправление в меню выбора дня недели для группы {group_id} (контекст: {context})")
                 text = (f"🔄 Группа изменена на: *{group_id}*\nВыберите день недели для просмотра расписания:"
@@ -457,8 +459,8 @@ def register_handlers(bot):
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
-            else:  # context == "select"
-                logging.debug(f"Перенаправление в главное меню после выбора группы {group_id}")
+            else:  # context == "select" or unexpected context
+                logging.warning(f"Неожиданный контекст: {context}. Перенаправление в главное меню для группы {group_id}")
                 retry_api_call(
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
