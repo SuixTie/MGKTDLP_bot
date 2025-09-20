@@ -445,6 +445,7 @@ def register_handlers(bot):
             user_groups[call.from_user.id] = group_id
             logging.debug(f"Выбрана группа: {group_id}, контекст: {context}")
             if context in ["lessons", "change_group"]:
+                logging.debug(f"Перенаправление в меню выбора дня недели для группы {group_id}")
                 retry_api_call(
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
@@ -454,6 +455,7 @@ def register_handlers(bot):
                     parse_mode='MarkdownV2'
                 )
             else:  # context == "select"
+                logging.debug(f"Перенаправление в главное меню после выбора группы {group_id}")
                 retry_api_call(
                     bot.edit_message_text,
                     chat_id=call.message.chat.id,
@@ -484,7 +486,7 @@ def register_handlers(bot):
                     parse_mode='MarkdownV2'
                 )
                 return
-            text = "📚 Сначала выберите группу:" if context == "lessons" else "👥 Выберите группу:"
+            text = "📚 Сначала выберите группу:" if context in ["lessons", "change_group"] else "👥 Выберите группу:"
             retry_api_call(
                 bot.edit_message_text,
                 chat_id=call.message.chat.id,
