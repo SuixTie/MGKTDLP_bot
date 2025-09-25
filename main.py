@@ -103,7 +103,6 @@ def run_scheduled_task():
     if success:
         logging.info("get_schedule.py завершён успешно, запускаем extract_schedule.py...")
         run_script('extract_schedule.py')
-        # Логируем содержимое extracted_schedules после выполнения
         extracted_dir = "extracted_schedules"
         if os.path.exists(extracted_dir):
             files = os.listdir(extracted_dir)
