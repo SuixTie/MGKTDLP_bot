@@ -7,27 +7,19 @@ import shutil
 from docx import Document
 import logging
 
-# Настройка логирования
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def convert_doc_to_docx(doc_path, temp_dir):
-    """
-    Конвертирует .doc файл в .docx с помощью libreoffice.
-    Возвращает путь к .docx файлу или None в случае ошибки.
-    """
     try:
-        # Создаём временный файл для .docx
         temp_docx_path = os.path.join(temp_dir, os.path.basename(doc_path).replace('.doc', '.docx'))
         logging.info(f"Конвертируем {doc_path} в {temp_docx_path} с помощью libreoffice")
 
-        # Проверяем, существует ли команда libreoffice
         result = subprocess.run(['which', 'libreoffice'], capture_output=True, text=True)
         if result.returncode != 0:
             logging.error(f"libreoffice не найден в системе: {result.stderr}")
             return None
         logging.debug(f"libreoffice найден: {result.stdout.strip()}")
 
-        # Проверяем права доступа
         if not os.access(temp_dir, os.W_OK):
             logging.error(f"Нет прав на запись в {temp_dir}")
             return None
@@ -35,21 +27,18 @@ def convert_doc_to_docx(doc_path, temp_dir):
             logging.error(f"Нет прав на чтение {doc_path}")
             return None
 
-        # Проверяем версию libreoffice
         version_result = subprocess.run(['libreoffice', '--version'], capture_output=True, text=True)
         logging.debug(f"Версия libreoffice: {version_result.stdout.strip()}")
         if version_result.returncode != 0:
             logging.error(f"Ошибка при проверке версии libreoffice: {version_result.stderr}")
             return None
 
-        # Проверяем работоспособность libreoffice
         test_result = subprocess.run(
             ['libreoffice', '--headless', '--convert-to', 'txt', '/app/README.md', '--outdir', temp_dir],
             capture_output=True, text=True, timeout=30
         )
         logging.debug(f"Тестовая конверсия README.md: stdout={test_result.stdout}, stderr={test_result.stderr}, returncode={test_result.returncode}")
 
-        # Запускаем libreoffice для конверсии
         logging.debug(f"Выполняем команду: libreoffice --headless --convert-to docx {doc_path} --outdir {temp_dir}")
         try:
             result = subprocess.run(
@@ -83,10 +72,6 @@ def convert_doc_to_docx(doc_path, temp_dir):
         return None
 
 def extract_doc_to_txt(doc_path, txt_path):
-    """
-    Извлекает текст из Word файла (.doc или .docx) и сохраняет в TXT файл,
-    сохраняя структуру таблиц и обрабатывая отступы.
-    """
     try:
         if not os.path.exists(doc_path):
             raise FileNotFoundError(f"Файл {doc_path} не найден")
@@ -96,7 +81,6 @@ def extract_doc_to_txt(doc_path, txt_path):
         logging.info(f"Обработка файла: {doc_path}")
         text_lines = []
 
-        # Если файл .doc, конвертируем в .docx
         temp_docx_path = doc_path
         temp_dir = None
         if doc_path.endswith('.doc'):
@@ -105,24 +89,20 @@ def extract_doc_to_txt(doc_path, txt_path):
             if not temp_docx_path:
                 raise RuntimeError(f"Не удалось конвертировать {doc_path} в .docx")
 
-        # Извлечение текста из .docx
         try:
             doc = Document(temp_docx_path)
             logging.info(f"Открыт файл: {temp_docx_path}")
-            # Извлекаем текст из параграфов
             for para in doc.paragraphs:
                 text = para.text.strip()
                 if text:
                     text_lines.append(text)
                     logging.debug(f"Извлечен параграф: {text}")
 
-            # Извлекаем текст из таблиц
             for table in doc.tables:
                 max_columns = max(len(row.cells) for row in table.rows)
                 logging.debug(f"Обработка таблицы с {max_columns} столбцами")
                 for row in table.rows:
                     cells = [cell.text.strip().replace('\n', ' ').replace('/', '|') for cell in row.cells]
-                    # Обработка объединённых ячеек
                     merged_cells = []
                     col_idx = 0
                     for cell in row.cells:
@@ -152,7 +132,6 @@ def extract_doc_to_txt(doc_path, txt_path):
                         logging.debug(f"Удалён временный файл: {temp_docx_path}")
                     except Exception as e:
                         logging.error(f"Ошибка при удалении {temp_docx_path}: {e}")
-                # Рекурсивно удаляем временную директорию
                 try:
                     shutil.rmtree(temp_dir, ignore_errors=True)
                     logging.debug(f"Удалена временная директория: {temp_dir}")
@@ -163,14 +142,12 @@ def extract_doc_to_txt(doc_path, txt_path):
             logging.warning(f"Файл {doc_path} пуст или не содержит полезного текста")
             return False
 
-        # Сохраняем в TXT файл
         os.makedirs(os.path.dirname(txt_path), exist_ok=True)
         with open(txt_path, 'w', encoding='utf-8') as txt_file:
             for line in text_lines:
                 txt_file.write(line + '\n')
         logging.info(f"Текст успешно извлечён из {doc_path} и сохранён в {txt_path}")
 
-        # Проверяем содержимое файла
         if os.path.exists(txt_path):
             with open(txt_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
@@ -187,7 +164,6 @@ def extract_doc_to_txt(doc_path, txt_path):
         return False
 
 def main():
-    """Основная функция для обработки всех .doc файлов в downloaded_schedules."""
     downloaded_dir = "downloaded_schedules"
     extracted_dir = "extracted_schedules"
     os.makedirs(extracted_dir, exist_ok=True)
@@ -196,7 +172,6 @@ def main():
     doc_files = [f for f in os.listdir(downloaded_dir) if f.endswith(('.doc', '.docx'))]
     logging.info(f"Найдено {len(doc_files)} файлов: {doc_files}")
 
-    # Соответствие файлов дням недели
     day_mapping = {
         "rasp_monday.doc": "rasp_monday.txt",
         "rasp_tuesday.doc": "rasp_tuesday.txt",
