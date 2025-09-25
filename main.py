@@ -12,28 +12,22 @@ import logging
 import parse_schedule
 import requests
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Загружаем переменные окружения
 load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 if not BOT_TOKEN:
     logging.error("BOT_TOKEN не указан в переменных окружения")
     sys.exit(1)
 
-# Глобальные переменные для graceful shutdown
 running = True
 flask_app = Flask(__name__)
 
-# Инициализация Telegram-бота
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Регистрируем обработчики из parse_schedule
 parse_schedule.register_handlers(bot)
 logging.info("Обработчики из parse_schedule зарегистрированы")
 
-# Webhook-обработчик для Telegram
 @flask_app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     try:
@@ -52,7 +46,6 @@ def index():
     return 'Telegram Bot is running! 🚀'
 
 def run_script(script_name):
-    """Запускает скрипт с захватом вывода и явной кодировкой UTF-8."""
     logging.info(f"Начинаем запуск {script_name}...")
     if not os.path.exists(script_name):
         logging.error(f"Скрипт {script_name} не найден в текущей директории: {os.getcwd()}")
@@ -87,7 +80,6 @@ def run_script(script_name):
         return False
 
 def run_all_scripts_at_startup():
-    """Запускает скрипты при старте программы последовательно."""
     scripts = ['get_schedule.py', 'extract_schedule.py']
     success_count = 0
     for script in scripts:
@@ -95,7 +87,6 @@ def run_all_scripts_at_startup():
             success_count += 1
         else:
             logging.error(f"Скрипт {script} завершился с ошибкой, продолжаем...")
-    # Логируем содержимое extracted_schedules для отладки
     extracted_dir = "extracted_schedules"
     if os.path.exists(extracted_dir):
         files = os.listdir(extracted_dir)
@@ -105,7 +96,6 @@ def run_all_scripts_at_startup():
     logging.info(f"Все скрипты при старте выполнены: {success_count}/{len(scripts)} успешно")
 
 def run_scheduled_task():
-    """Выполняет get_schedule.py и, если успешно, extract_schedule.py."""
     if not running:
         return
     logging.info("Запуск задачи по расписанию...")
@@ -124,7 +114,6 @@ def run_scheduled_task():
         logging.error("get_schedule.py завершился с ошибкой, extract_schedule.py не запускается.")
 
 def check_webhook():
-    """Проверяет статус webhook'а."""
     try:
         response = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo")
         data = response.json()
@@ -140,7 +129,6 @@ def check_webhook():
         logging.error(f"Ошибка при запросе getWebhookInfo: {e}")
 
 def setup_webhook():
-    """Устанавливает webhook в фоне."""
     render_hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME')
     if render_hostname:
         bot.remove_webhook()
@@ -154,7 +142,6 @@ def setup_webhook():
             logging.error(f"Ошибка установки webhook: {e}")
 
 def signal_handler(sig, frame):
-    """Обработчик сигналов для graceful shutdown."""
     global running
     logging.info("Получен сигнал остановки. Завершаем работу...")
     running = False
@@ -163,7 +150,6 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def main():
-    """Основная функция: запускает HTTP-сервер, скрипты и schedule в фоне."""
     logging.info("main.py запущен. Начинаем инициализацию...")
     logging.info(f"Текущая директория: {os.getcwd()}")
     logging.info(f"Файлы в директории: {os.listdir()}")
@@ -184,9 +170,10 @@ def main():
         logging.error(f"Ошибка Flask: {e}")
 
 def run_schedule_in_background():
-    """Запускает schedule в фоновом потоке."""
-    schedule.every().day.at("08:00").do(run_scheduled_task)
-    schedule.every().day.at("20:00").do(run_scheduled_task)
+    schedule.every().day.at("06:00").do(run_scheduled_task)
+    schedule.every().day.at("12:00").do(run_scheduled_task)
+    schedule.every().day.at("18:00").do(run_scheduled_task)
+    schedule.every().day.at("24:00").do(run_scheduled_task)
     while running:
         schedule.run_pending()
         time.sleep(60)
