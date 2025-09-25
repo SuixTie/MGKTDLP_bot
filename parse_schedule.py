@@ -6,10 +6,8 @@ import logging
 import time
 from dotenv import load_dotenv
 
-# Настройка логирования
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Загружаем переменные окружения
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
@@ -18,11 +16,9 @@ if not BOT_TOKEN:
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Словарь для хранения номеров групп пользователей (user_id: group_id)
 user_groups = {}
 
 def retry_api_call(func, *args, retries=3, delay=1, **kwargs):
-    """Повторяет вызов Telegram API при сетевых ошибках."""
     for attempt in range(retries):
         try:
             return func(*args, **kwargs)
@@ -34,15 +30,11 @@ def retry_api_call(func, *args, retries=3, delay=1, **kwargs):
                 raise
 
 def escape_markdown_v2(text):
-    """Экранирует специальные символы для MarkdownV2, исключая * для полужирного начертания."""
-    # Заменяем en dash (–) на дефис (-) и bullet (•) на *
     text = text.replace('–', '-').replace('•', '*')
-    # Экранируем все специальные символы, кроме *
     special_chars = r'([_~`\[()\]#+-=|{.}!])'
     return re.sub(special_chars, r'\\\1', str(text))
 
 def save_schedule(groups, block_schedule, schedules):
-    """Сохраняет расписание для групп в словаре schedules."""
     logging.debug(f"Сохранение расписания для групп: {groups}")
     try:
         for col, group in enumerate(groups):
@@ -50,41 +42,30 @@ def save_schedule(groups, block_schedule, schedules):
             lessons = []
             for lesson in block_schedule[col]:
                 if lesson:
-                    # Удаляем ведущие цифры (например, "1 ")
                     cleaned = re.sub(r'^\d+\s*', '', lesson).strip()
                     cleaned = re.sub(r'\s+', ' ', cleaned.replace('\xa0', ' '))
-                    # Проверяем, начинается ли урок с -------
                     if cleaned.startswith('-------') or cleaned == '-------':
                         lessons.append('')
                         continue
-                    # Обрабатываем случаи вроде "ИнЯ/ИнЯ309/323" или "ОхрОкрСр/э/306"
                     concatenated_pattern = r'^([^0-9|]+?)([0-9/]+)$'
                     concatenated_match = re.match(concatenated_pattern, cleaned)
                     if concatenated_match:
                         subject = concatenated_match.group(1).strip()
                         rooms = concatenated_match.group(2).strip()
-                        # Удаляем ведущий слеш из rooms, если он есть
                         rooms = rooms.lstrip('/')
-                        # Заменяем | на / в предметах, если нужно
                         subject = subject.replace('|', '/')
-                        # Форматируем без скобок
                         cleaned = f"{subject} – {rooms} каб." if rooms else subject
                     else:
-                        # Стандартная обработка: разделяем предмет и аудиторию
                         subject_pattern = r'^[^0-9|]*'
                         subject_match = re.search(subject_pattern, cleaned)
                         if subject_match and subject_match.group(0).strip():
                             subject = subject_match.group(0).rstrip('|').strip()
                             rooms = cleaned[subject_match.end():].strip()
                             rooms = re.sub(r'\bпр', '', rooms)
-                            # Удаляем ведущий слеш из rooms, если он есть
                             rooms = rooms.lstrip('/')
-                            # Заменяем | на / в предметах, если нужно
                             subject = subject.replace('|', '/')
-                            # Форматируем без скобок
                             cleaned = f"{subject} – {rooms} каб." if rooms else subject
                         else:
-                            # Если нет разделения на предмет и аудиторию
                             cleaned = cleaned.replace('|', '/')
                     lessons.append(cleaned)
                 else:
@@ -464,7 +445,7 @@ def register_handlers(bot):
                     reply_markup=get_days_keyboard(),
                     parse_mode='MarkdownV2'
                 )
-            else:  # context == "select" or unexpected context
+            else:
                 logging.warning(f"Неожиданный контекст: {context}. Перенаправление в главное меню для группы {group_id}")
                 retry_api_call(
                     bot.edit_message_text,
@@ -557,7 +538,6 @@ def register_handlers(bot):
                     response = f"📚 Расписание для группы *{group_id}* на *{day}* ({date}):\n\n"
                     for idx, lesson in enumerate(schedule, start=1):
                         if lesson:
-                            # Разделяем предмет и аудиторию для применения полужирного шрифта к номеру кабинета
                             parts = lesson.split(' – ')
                             if len(parts) == 2:
                                 subject, room = parts
